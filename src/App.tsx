@@ -20,7 +20,7 @@ import {
   type Toast,
 } from "./utils/recordingUtils";
 
-const DashboardPage: React.FC = () => {
+const OnScreenRecorder: React.FC = () => {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordedVideoURL, setRecordedVideoURL] = useState<string | null>(null);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
@@ -398,4 +398,4 @@ const DashboardPage: React.FC = () => {
   );
 };
 
-export default DashboardPage;
+export default OnScreenRecorder;
