@@ -1,0 +1,355 @@
+.onscreen-recorder-container {
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, #111827, #1f2937, #111827);
+  padding: 1.5rem;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.onscreen-recorder-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.onscreen-recorder-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.onscreen-recorder-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 0.5rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.onscreen-recorder-title-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #60a5fa;
+}
+
+.onscreen-recorder-subtitle {
+  color: #9ca3af;
+  margin: 0;
+}
+
+.onscreen-recorder-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .onscreen-recorder-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.onscreen-recorder-card {
+  background-color: #1f2937;
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 1.5rem;
+  border: 1px solid #374151;
+}
+
+.onscreen-recorder-card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 1rem 0;
+}
+
+.onscreen-recorder-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.onscreen-recorder-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.onscreen-recorder-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #d1d5db;
+}
+
+.onscreen-recorder-input {
+  width: 100%;
+  background-color: #374151;
+  color: #ffffff;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #4b5563;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.onscreen-recorder-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.onscreen-recorder-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.onscreen-recorder-button-group {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.onscreen-recorder-button {
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.onscreen-recorder-button-primary {
+  flex: 1;
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+.onscreen-recorder-button-primary:hover {
+  background-color: #1d4ed8;
+}
+
+.onscreen-recorder-button-secondary {
+  background-color: #4b5563;
+  color: #ffffff;
+}
+
+.onscreen-recorder-button-secondary:hover {
+  background-color: #374151;
+}
+
+.onscreen-recorder-button-success {
+  flex: 1;
+  background-color: #16a34a;
+  color: #ffffff;
+}
+
+.onscreen-recorder-button-success:hover {
+  background-color: #15803d;
+}
+
+.onscreen-recorder-button-purple {
+  flex: 1;
+  background-color: #9333ea;
+  color: #ffffff;
+}
+
+.onscreen-recorder-button-purple:hover {
+  background-color: #7e22ce;
+}
+
+.onscreen-recorder-button-purple:disabled,
+.onscreen-recorder-button-disabled {
+  background-color: #4b5563;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.onscreen-recorder-button-danger {
+  flex: 1;
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.onscreen-recorder-button-danger:hover {
+  background-color: #b91c1c;
+}
+
+.onscreen-recorder-button-small {
+  font-size: 0.875rem;
+  background-color: #374151;
+  color: #ffffff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.375rem;
+  transition: background-color 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+.onscreen-recorder-button-small:hover {
+  background-color: #4b5563;
+}
+
+.onscreen-recorder-button-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.onscreen-recorder-recording {
+  animation: onscreen-recorder-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes onscreen-recorder-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.onscreen-recorder-video-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.onscreen-recorder-video-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #ffffff;
+  margin: 0;
+}
+
+.onscreen-recorder-video {
+  width: 100%;
+  border-radius: 0.5rem;
+  background-color: #000000;
+}
+
+.onscreen-recorder-empty-state {
+  background-color: #374151;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.onscreen-recorder-empty-icon {
+  width: 4rem;
+  height: 4rem;
+  color: #6b7280;
+  margin: 0 auto 0.75rem;
+}
+
+.onscreen-recorder-empty-text {
+  color: #9ca3af;
+  margin: 0;
+}
+
+.onscreen-recorder-empty-subtext {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0 0;
+}
+
+.onscreen-recorder-recording-indicator {
+  background-color: rgba(220, 38, 38, 0.2);
+  border: 1px solid #dc2626;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.onscreen-recorder-recording-dot {
+  width: 1rem;
+  height: 1rem;
+  background-color: #dc2626;
+  border-radius: 50%;
+  margin: 0 auto 0.75rem;
+  animation: onscreen-recorder-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.onscreen-recorder-recording-text {
+  color: #fca5a5;
+  font-weight: 600;
+  margin: 0;
+}
+
+.onscreen-recorder-recording-subtext {
+  color: #fecaca;
+  font-size: 0.875rem;
+  margin: 0.5rem 0 0 0;
+}
+
+.onscreen-recorder-console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.onscreen-recorder-console {
+  background-color: #000000;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  height: 24rem;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875rem;
+}
+
+.onscreen-recorder-console-empty {
+  color: #6b7280;
+  margin: 0;
+}
+
+.onscreen-recorder-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.onscreen-recorder-log {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.onscreen-recorder-log-timestamp {
+  color: #6b7280;
+}
+
+.onscreen-recorder-log-icon {
+  display: inline-block;
+}
+
+.onscreen-recorder-log-icon-error {
+  color: #f87171;
+}
+
+.onscreen-recorder-log-icon-success {
+  color: #86efac;
+}
+
+.onscreen-recorder-log-icon-info {
+  color: #93c5fd;
+}
+
+.onscreen-recorder-log-message {
+  flex: 1;
+}
+
+.onscreen-recorder-log-message-error {
+  color: #fca5a5;
+}
+
+.onscreen-recorder-log-message-success {
+  color: #86efac;
+}
+
+.onscreen-recorder-log-message-info {
+  color: #d1d5db;
+}

@@ -1,0 +1,86 @@
+{
+  "name": "onscreen-recorder",
+  "version": "1.0.0",
+  "description": "A beautiful React component for screen recording with microphone support, custom styling, and built-in console logging",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./styles": "./dist/index.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "rollup -c",
+    "build:lib": "rollup -c",
+    "build:example": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "prepublishOnly": "npm run build:lib"
+  },
+  "keywords": [
+    "react",
+    "screen-recorder",
+    "screen-capture",
+    "recording",
+    "video",
+    "media-recorder",
+    "webcam",
+    "microphone",
+    "typescript",
+    "component",
+    "ui"
+  ],
+  "author": "sharjeel884",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sharjeel884/onscreen-recorder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sharjeel884/onscreen-recorder/issues"
+  },
+  "homepage": "https://github.com/sharjeel884/onscreen-recorder#readme",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@rollup/plugin-commonjs": "^28.0.1",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-typescript": "^12.1.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "postcss": "^8.4.47",
+    "rollup": "^4.28.1",
+    "rollup-plugin-dts": "^6.1.1",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "rollup-plugin-postcss": "^4.0.2",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4"
+  }
+}
