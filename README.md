@@ -8,7 +8,7 @@ A beautiful, feature-rich React component for screen recording with microphone s
 - 🎤 **Microphone Support** - Optional microphone audio recording with automatic mixing
 - 🎨 **Beautiful UI** - Modern, responsive design with custom styling
 - 📊 **Console Logging** - Built-in console for real-time recording status
-- 📤 **Upload Support** - Built-in API upload functionality
+- 📤 **Upload Support** - Custom upload handling via callback
 - 📥 **Download Support** - Easy video download
 - 🔧 **TypeScript** - Fully typed with TypeScript
 - ⚡ **Lightweight** - Zero external icon dependencies, custom SVG icons included, optimized bundle size
@@ -66,7 +66,6 @@ function App() {
 
   return (
     <ScreenRecorder
-      apiEndpoint="https://your-api.com/upload"
       onRecordingStart={handleRecordingStart}
       onRecordingStop={handleRecordingStop}
       defaultMicEnabled={true}
@@ -81,11 +80,10 @@ function App() {
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `apiEndpoint` | `string` | `"https://httpbin.org/post"` | API endpoint for uploading recordings |
 | `onRecordingStart` | `() => void` | `undefined` | Callback fired when recording starts |
 | `onRecordingStop` | `(blob: Blob) => void` | `undefined` | Callback fired when recording stops, receives the video blob |
 | `onDownload` | `(blob: Blob) => void` | `undefined` | Callback fired when video is downloaded |
-| `onUpload` | `(response: any) => void` | `undefined` | Callback fired when upload completes successfully |
+| `onUpload` | `(blob: Blob) => void` | `undefined` | Callback fired when upload button is clicked, receives the video blob for custom upload handling |
 | `onError` | `(error: Error) => void` | `undefined` | Callback fired when an error occurs |
 | `defaultMicEnabled` | `boolean` | `true` | Whether microphone is enabled by default |
 | `className` | `string` | `""` | Additional CSS class name for the container |
@@ -100,9 +98,25 @@ import { ScreenRecorder } from "onscreen-recorder";
 import "onscreen-recorder/styles";
 
 function App() {
+  const handleUpload = async (blob: Blob) => {
+    // Implement your custom upload logic here
+    const formData = new FormData();
+    formData.append("video", blob, `screen-recording-${Date.now()}.webm`);
+    
+    try {
+      const response = await fetch("https://your-api.com/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      console.log("📤 Upload successful!", result);
+    } catch (error) {
+      console.error("❌ Upload failed:", error);
+    }
+  };
+
   return (
     <ScreenRecorder
-      apiEndpoint="https://api.example.com/upload"
       onRecordingStart={() => {
         console.log("🎬 Recording started!");
       }}
@@ -113,9 +127,7 @@ function App() {
       onDownload={(blob) => {
         console.log("📥 Video downloaded!");
       }}
-      onUpload={(response) => {
-        console.log("📤 Upload successful!", response);
-      }}
+      onUpload={handleUpload}
       onError={(error) => {
         console.error("❌ Error:", error.message);
       }}
@@ -137,7 +149,6 @@ function App() {
   return (
     <ScreenRecorder
       className="my-custom-class"
-      apiEndpoint="https://api.example.com/upload"
     />
   );
 }

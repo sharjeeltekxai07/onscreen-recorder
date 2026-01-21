@@ -12,16 +12,14 @@ import {
 import "./ScreenRecorder.css";
 
 export interface ScreenRecorderProps {
-  /** API endpoint for uploading recordings */
-  apiEndpoint?: string;
   /** Callback when recording starts */
   onRecordingStart?: () => void;
   /** Callback when recording stops */
   onRecordingStop?: (blob: Blob) => void;
   /** Callback when video is downloaded */
   onDownload?: (blob: Blob) => void;
-  /** Callback when video is uploaded */
-  onUpload?: (response: any) => void;
+  /** Callback when upload button is clicked - receives the video blob for custom upload handling */
+  onUpload?: (blob: Blob) => void;
   /** Callback when an error occurs */
   onError?: (error: Error) => void;
   /** Enable/disable microphone by default */
@@ -31,7 +29,6 @@ export interface ScreenRecorderProps {
 }
 
 export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
-  apiEndpoint = "https://httpbin.org/post",
   onRecordingStart,
   onRecordingStop,
   onDownload,
@@ -43,8 +40,6 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordedVideoURL, setRecordedVideoURL] = useState<string | null>(null);
   const [consoleLogs, setConsoleLogs] = useState<Array<{ message: string; type: string; timestamp: string }>>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [currentApiEndpoint, setCurrentApiEndpoint] = useState(apiEndpoint);
   const [micEnabled, setMicEnabled] = useState(defaultMicEnabled);
   const [hasMicPermission, setHasMicPermission] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -205,50 +200,17 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     }
   };
 
-  const uploadToAPI = async () => {
+  const handleUpload = () => {
     if (!recordedBlobRef.current) {
       addLog("No video to upload", "error");
       return;
     }
 
-    setIsUploading(true);
-    addLog(`Starting upload to: ${currentApiEndpoint}`, "info");
-
-    try {
-      const formData = new FormData();
-      const filename = `screen-recording-${Date.now()}.webm`;
-      formData.append("video", recordedBlobRef.current, filename);
-      formData.append("timestamp", new Date().toISOString());
-      formData.append("size", recordedBlobRef.current.size.toString());
-
-      addLog("Sending request...", "info");
-
-      const response = await fetch(currentApiEndpoint, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        addLog(`Upload successful! Status: ${response.status}`, "success");
-        addLog(`Response: ${JSON.stringify(result).substring(0, 200)}...`, "success");
-        if (onUpload) {
-          onUpload(result);
-        }
-      } else {
-        addLog(`Upload failed! Status: ${response.status}`, "error");
-        if (onError) {
-          onError(new Error(`Upload failed with status: ${response.status}`));
-        }
-      }
-    } catch (error) {
-      const err = error as Error;
-      addLog(`Upload error: ${err.message}`, "error");
-      if (onError) {
-        onError(err);
-      }
-    } finally {
-      setIsUploading(false);
+    addLog("Upload button clicked", "info");
+    if (onUpload) {
+      onUpload(recordedBlobRef.current);
+    } else {
+      addLog("No upload handler provided. Implement onUpload prop to handle uploads.", "info");
     }
   };
 
@@ -273,9 +235,6 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     };
   }, [recordedVideoURL]);
 
-  useEffect(() => {
-    setCurrentApiEndpoint(apiEndpoint);
-  }, [apiEndpoint]);
 
   return (
     <div className={`onscreen-recorder-container ${className}`}>
@@ -294,19 +253,6 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
             <h2 className="onscreen-recorder-card-title">Recording</h2>
 
             <div className="onscreen-recorder-controls">
-              {/* API Endpoint Input */}
-              <div className="onscreen-recorder-input-group">
-                <label className="onscreen-recorder-label">API Endpoint</label>
-                <input
-                  type="text"
-                  value={currentApiEndpoint}
-                  onChange={(e) => setCurrentApiEndpoint(e.target.value)}
-                  placeholder="https://your-api.com/upload"
-                  className="onscreen-recorder-input"
-                  disabled={isRecording || isUploading}
-                />
-              </div>
-
               {/* Control Buttons */}
               <div className="onscreen-recorder-button-group">
                 {!isRecording ? (
@@ -342,14 +288,15 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
                       <DownloadIcon className="onscreen-recorder-button-icon" size={16} />
                       Download
                     </button>
-                    <button
-                      onClick={uploadToAPI}
-                      disabled={isUploading}
-                      className={`onscreen-recorder-button onscreen-recorder-button-purple ${isUploading ? "onscreen-recorder-button-disabled" : ""}`}
-                    >
-                      <UploadIcon className="onscreen-recorder-button-icon" size={16} />
-                      {isUploading ? "Uploading..." : "Upload"}
-                    </button>
+                    {onUpload && (
+                      <button
+                        onClick={handleUpload}
+                        className="onscreen-recorder-button onscreen-recorder-button-purple"
+                      >
+                        <UploadIcon className="onscreen-recorder-button-icon" size={16} />
+                        Upload
+                      </button>
+                    )}
                     <button onClick={clearRecording} className="onscreen-recorder-button onscreen-recorder-button-secondary">
                       <TrashIcon className="onscreen-recorder-button-icon" size={16} />
                       Clear

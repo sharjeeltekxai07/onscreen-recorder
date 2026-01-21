@@ -15,8 +15,21 @@ function App() {
     console.log("Video downloaded! Blob size:", blob.size);
   };
 
-  const handleUpload = (response: any) => {
-    console.log("Video uploaded successfully!", response);
+  const handleUpload = async (blob: Blob) => {
+    // Example: Custom upload implementation
+    const formData = new FormData();
+    formData.append("video", blob, `screen-recording-${Date.now()}.webm`);
+    
+    try {
+      const response = await fetch("https://httpbin.org/post", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      console.log("Video uploaded successfully!", result);
+    } catch (error) {
+      console.error("Upload failed:", error);
+    }
   };
 
   const handleError = (error: Error) => {
@@ -25,7 +38,6 @@ function App() {
 
   return (
     <ScreenRecorder
-      apiEndpoint="https://httpbin.org/post"
       onRecordingStart={handleRecordingStart}
       onRecordingStop={handleRecordingStop}
       onDownload={handleDownload}
