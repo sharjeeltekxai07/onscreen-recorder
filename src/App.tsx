@@ -28,12 +28,15 @@ const DashboardPage: React.FC = () => {
   const [, setToasts] = useState<Toast[]>([]);
   const [micEnabled, setMicEnabled] = useState<boolean>(true);
   const [hasMicPermission, setHasMicPermission] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isPreparing, setIsPreparing] = useState<boolean>(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const recordedBlobRef = useRef<Blob | null>(null);
   const toastTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Wrapper functions for utilities
   const addLog = (message: string, type: "info" | "success" | "error" = "info") => {
@@ -44,7 +47,13 @@ const DashboardPage: React.FC = () => {
     showToastUtil(setToasts, toastTimeoutsRef, message, type);
   };
 
-  const startRecording = async (): Promise<void> => {
+  const startCountdown = (): void => {
+    setIsPreparing(true);
+    setCountdown(3);
+    addLog("Preparing to record...", "info");
+  };
+
+  const actualStartRecording = async (): Promise<void> => {
     try {
       addLog("Requesting screen capture...", "info");
 
@@ -118,7 +127,14 @@ const DashboardPage: React.FC = () => {
       addLog(`Error: ${error.message}`, "error");
       showToast(`❌ Error: ${error.message}`, "error");
       console.error("Error accessing screen:", err);
+    } finally {
+      setIsPreparing(false);
+      setCountdown(null);
     }
+  };
+
+  const startRecording = (): void => {
+    startCountdown();
   };
 
   const stopRecording = (): void => {
@@ -148,6 +164,9 @@ const DashboardPage: React.FC = () => {
         URL.revokeObjectURL(recordedVideoURL);
       }
       toastTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+      if (countdownTimeoutRef.current) {
+        clearTimeout(countdownTimeoutRef.current);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -161,6 +180,26 @@ const DashboardPage: React.FC = () => {
     };
   }, [recordedVideoURL]);
 
+  // Handle countdown timer
+  useEffect(() => {
+    if (countdown !== null && countdown > 0) {
+      countdownTimeoutRef.current = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      // Countdown finished, start actual recording
+      setCountdown(null);
+      actualStartRecording();
+    }
+
+    return () => {
+      if (countdownTimeoutRef.current) {
+        clearTimeout(countdownTimeoutRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -170,7 +209,7 @@ const DashboardPage: React.FC = () => {
             <div className="space-y-5 sm:space-y-6">
               {/* Control Buttons */}
               <div className="flex flex-col sm:flex-row gap-3">
-                {!isRecording ? (
+                {!isRecording && !isPreparing ? (
                   <>
                     <button
                       onClick={startRecording}
@@ -182,8 +221,8 @@ const DashboardPage: React.FC = () => {
                     <button
                       onClick={() => setMicEnabled(!micEnabled)}
                       className={`${micEnabled
-                          ? "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-600/30 hover:shadow-emerald-600/50"
-                          : "bg-slate-700 hover:bg-slate-600 shadow-slate-700/30"
+                        ? "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-emerald-600/30 hover:shadow-emerald-600/50"
+                        : "bg-slate-700 hover:bg-slate-600 shadow-slate-700/30"
                         } text-white font-semibold py-3.5 px-4 sm:px-5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98]`}
                       title={micEnabled ? "Microphone Enabled" : "Microphone Disabled"}
                     >
@@ -241,8 +280,33 @@ const DashboardPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Countdown Overlay */}
+              {isPreparing && countdown !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                  <div className="text-center">
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className={`w-48 h-48 rounded-full border-8 transition-all duration-300 ${countdown === 3 ? "border-blue-500 animate-pulse" :
+                          countdown === 2 ? "border-yellow-500 animate-pulse" :
+                            "border-green-500 animate-pulse"
+                          }`}></div>
+                      </div>
+                      <div className="relative flex items-center justify-center w-48 h-48">
+                        <span className={`text-9xl font-bold transition-all duration-300 ${countdown === 3 ? "text-blue-400" :
+                          countdown === 2 ? "text-yellow-400" :
+                            "text-green-400"
+                          }`}>
+                          {countdown}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-8 text-xl text-slate-300 font-semibold">Preparing to record...</p>
+                  </div>
+                </div>
+              )}
+
               {/* Empty State */}
-              {!recordedVideoURL && !isRecording && (
+              {!recordedVideoURL && !isRecording && !isPreparing && (
                 <div className="bg-slate-700/50 rounded-xl p-8 sm:p-12 text-center border-2 border-dashed border-slate-600/50">
                   <div className="flex justify-center mb-4">
                     <div className="p-4 bg-slate-800/50 rounded-full">
@@ -303,20 +367,20 @@ const DashboardPage: React.FC = () => {
                         <span className="text-slate-500 shrink-0">[{log.timestamp}]</span>
                         <span
                           className={`shrink-0 ${log.type === "error"
-                              ? "text-red-400"
-                              : log.type === "success"
-                                ? "text-emerald-400"
-                                : "text-blue-400"
+                            ? "text-red-400"
+                            : log.type === "success"
+                              ? "text-emerald-400"
+                              : "text-blue-400"
                             }`}
                         >
                           {log.type === "error" ? "❌" : log.type === "success" ? "✓" : "ℹ"}
                         </span>
                         <span
                           className={`break-words ${log.type === "error"
-                              ? "text-red-300"
-                              : log.type === "success"
-                                ? "text-emerald-300"
-                                : "text-slate-300"
+                            ? "text-red-300"
+                            : log.type === "success"
+                              ? "text-emerald-300"
+                              : "text-slate-300"
                             }`}
                         >
                           {log.message}
