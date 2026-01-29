@@ -64,13 +64,7 @@ function App() {
     console.log("Recording stopped! Blob size:", blob.size);
   };
 
-  return (
-    <ScreenRecorder
-      onRecordingStart={handleRecordingStart}
-      onRecordingStop={handleRecordingStop}
-      defaultMicEnabled={true}
-    />
-  );
+  return <ScreenRecorder onRecordingStart={handleRecordingStart} onRecordingStop={handleRecordingStop} defaultMicEnabled={true} />;
 }
 ```
 
@@ -78,15 +72,16 @@ function App() {
 
 ### ScreenRecorder Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `onRecordingStart` | `() => void` | `undefined` | Callback fired when recording starts |
-| `onRecordingStop` | `(blob: Blob) => void` | `undefined` | Callback fired when recording stops, receives the video blob |
-| `onDownload` | `(blob: Blob) => void` | `undefined` | Callback fired when video is downloaded |
-| `onUpload` | `(blob: Blob) => void` | `undefined` | Callback fired when upload button is clicked, receives the video blob for custom upload handling |
-| `onError` | `(error: Error) => void` | `undefined` | Callback fired when an error occurs |
-| `defaultMicEnabled` | `boolean` | `true` | Whether microphone is enabled by default |
-| `className` | `string` | `""` | Additional CSS class name for the container |
+| Prop                | Type                     | Default     | Description                                                                                      |
+| ------------------- | ------------------------ | ----------- | ------------------------------------------------------------------------------------------------ |
+| `onRecordingStart`  | `() => void`             | `undefined` | Callback fired when recording starts                                                             |
+| `onRecordingStop`   | `(blob: Blob) => void`   | `undefined` | Callback fired when recording stops, receives the video blob                                     |
+| `onDownload`        | `(blob: Blob) => void`   | `undefined` | Callback fired when video is downloaded                                                          |
+| `onUpload`          | `(blob: Blob) => void`   | `undefined` | Callback fired when upload button is clicked, receives the video blob for custom upload handling |
+| `onError`           | `(error: Error) => void` | `undefined` | Callback fired when an error occurs                                                              |
+| `defaultMicEnabled` | `boolean`                | `true`      | Whether microphone is enabled by default                                                         |
+| `countdownSeconds`  | `number`                 | `3`         | Seconds to count down (3, 2, 1) after you select your screen; then recording starts. Use `0` to start immediately. |
+| `className`         | `string`                 | `""`        | Additional CSS class name for the container                                                      |
 
 ## Examples
 
@@ -102,7 +97,7 @@ function App() {
     // Implement your custom upload logic here
     const formData = new FormData();
     formData.append("video", blob, `screen-recording-${Date.now()}.webm`);
-    
+
     try {
       const response = await fetch("https://your-api.com/upload", {
         method: "POST",
@@ -146,11 +141,7 @@ import "onscreen-recorder/styles";
 import "./custom-styles.css";
 
 function App() {
-  return (
-    <ScreenRecorder
-      className="my-custom-class"
-    />
-  );
+  return <ScreenRecorder className="my-custom-class" />;
 }
 ```
 

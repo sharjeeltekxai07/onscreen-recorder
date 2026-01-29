@@ -24,6 +24,8 @@ export interface ScreenRecorderProps {
   onError?: (error: Error) => void;
   /** Enable/disable microphone by default */
   defaultMicEnabled?: boolean;
+  /** Seconds to count down after user selects screen (3, 2, 1 then record). Set to 0 to record immediately after selection. */
+  countdownSeconds?: number;
   /** Custom class name for the container */
   className?: string;
 }
@@ -35,6 +37,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   onUpload,
   onError,
   defaultMicEnabled = true,
+  countdownSeconds = 3,
   className = "",
 }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -42,12 +45,17 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   const [consoleLogs, setConsoleLogs] = useState<Array<{ message: string; type: string; timestamp: string }>>([]);
   const [micEnabled, setMicEnabled] = useState(defaultMicEnabled);
   const [hasMicPermission, setHasMicPermission] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const recordedBlobRef = useRef<Blob | null>(null);
   const toastTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const combinedStreamRef = useRef<MediaStream | null>(null);
+  const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const addLog = (message: string, type: "info" | "success" | "error" = "info") => {
     const timestamp = new Date().toLocaleTimeString();
@@ -71,18 +79,35 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     }
   };
 
-  const startRecording = async () => {
+  const releaseAllStreams = () => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current = null;
+      setHasMicPermission(false);
+    }
+    if (combinedStreamRef.current) {
+      combinedStreamRef.current.getTracks().forEach((track) => track.stop());
+      combinedStreamRef.current = null;
+    }
+  };
+
+  const acquireStreamAndStartCountdown = async () => {
     try {
       addLog("Requesting screen capture...", "info");
 
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { mediaSource: "screen" } as any,
+        video: { mediaSource: "screen" } as MediaTrackConstraints,
         audio: true,
       });
 
-      addLog("Screen capture started successfully", "success");
+      screenStreamRef.current = screenStream;
+      addLog("Screen selected. Starting countdown...", "success");
 
-      let combinedStream = screenStream;
+      let combinedStream: MediaStream = screenStream;
 
       // Request microphone if enabled
       if (micEnabled) {
@@ -106,8 +131,8 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
               combinedStream = new MediaStream([...videoTracks, ...destination.stream.getAudioTracks()]);
               addLog("Screen and microphone audio combined", "success");
             } catch (audioErr) {
-              const error = audioErr as Error;
-              addLog(`Audio mixing failed: ${error.message}, using microphone only`, "info");
+              const err = audioErr as Error;
+              addLog(`Audio mixing failed: ${err.message}, using microphone only`, "info");
               combinedStream = new MediaStream([...videoTracks, ...micAudioTracks]);
             }
           } else if (micAudioTracks.length > 0) {
@@ -125,49 +150,99 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
         }
       }
 
-      mediaRecorderRef.current = new MediaRecorder(combinedStream, {
-        mimeType: "video/webm;codecs=vp8,opus",
-      });
+      combinedStreamRef.current = combinedStream;
+      const seconds = Math.max(0, Math.min(10, countdownSeconds ?? 0));
 
-      chunksRef.current = [];
-
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-          addLog(`Data chunk received: ${(e.data.size / 1024).toFixed(2)} KB`, "info");
-        }
-      };
-
-      mediaRecorderRef.current.onstop = () => {
-        addLog("Recording stopped, processing video...", "info");
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
-        const url = URL.createObjectURL(blob);
-        setRecordedVideoURL(url);
-        recordedBlobRef.current = blob;
-        addLog(`Video ready! Size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, "success");
-
-        screenStream.getTracks().forEach((track) => track.stop());
-        if (micStreamRef.current) {
-          micStreamRef.current.getTracks().forEach((track) => track.stop());
-        }
-
-        if (onRecordingStop) {
-          onRecordingStop(blob);
-        }
-      };
-
-      mediaRecorderRef.current.start(1000);
-      setIsRecording(true);
-      addLog("Recording in progress...", "success");
-
-      if (onRecordingStart) {
-        onRecordingStart();
+      if (seconds > 0) {
+        addLog(`Recording starts in ${seconds}...`, "info");
+        setIsPreparing(true);
+        setCountdown(seconds);
+      } else {
+        startMediaRecorderWithStream();
       }
     } catch (err) {
       const error = err as Error;
       addLog(`Error: ${error.message}`, "error");
       if (onError) onError(error);
+      releaseAllStreams();
+      setIsPreparing(false);
+      setCountdown(null);
     }
+  };
+
+  const startMediaRecorderWithStream = () => {
+    const stream = combinedStreamRef.current;
+    const screenStream = screenStreamRef.current;
+    if (!stream || !screenStream) {
+      addLog("No stream available to record", "error");
+      releaseAllStreams();
+      setIsPreparing(false);
+      setCountdown(null);
+      return;
+    }
+
+    chunksRef.current = [];
+    mediaRecorderRef.current = new MediaRecorder(stream, {
+      mimeType: "video/webm;codecs=vp8,opus",
+    });
+
+    mediaRecorderRef.current.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data);
+        addLog(`Data chunk received: ${(e.data.size / 1024).toFixed(2)} KB`, "info");
+      }
+    };
+
+    mediaRecorderRef.current.onstop = () => {
+      addLog("Recording stopped, processing video...", "info");
+      const blob = new Blob(chunksRef.current, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      setRecordedVideoURL(url);
+      recordedBlobRef.current = blob;
+      addLog(`Video ready! Size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, "success");
+      releaseAllStreams();
+      if (onRecordingStop) onRecordingStop(blob);
+    };
+
+    mediaRecorderRef.current.onerror = () => {
+      addLog("Recording error – stopping and releasing microphone", "error");
+      releaseAllStreams();
+      setIsRecording(false);
+      if (onError) onError(new Error("MediaRecorder error"));
+    };
+
+    screenStream.getVideoTracks().forEach((track) => {
+      track.onended = () => {
+        addLog("Screen sharing stopped by browser – releasing microphone", "info");
+        if (mediaRecorderRef.current?.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+        setIsRecording(false);
+      };
+    });
+
+    mediaRecorderRef.current.start(1000);
+    setIsRecording(true);
+    setIsPreparing(false);
+    setCountdown(null);
+    combinedStreamRef.current = null;
+    addLog("Recording in progress...", "success");
+    if (onRecordingStart) onRecordingStart();
+  };
+
+  const startRecording = () => {
+    acquireStreamAndStartCountdown();
+  };
+
+  const cancelCountdown = () => {
+    if (countdownTimeoutRef.current) {
+      clearTimeout(countdownTimeoutRef.current);
+      countdownTimeoutRef.current = null;
+    }
+    releaseAllStreams();
+    setIsPreparing(false);
+    setCountdown(null);
+    addLog("Countdown cancelled", "info");
   };
 
   const stopRecording = () => {
@@ -222,9 +297,32 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     addLog("Screen Recorder initialized", "success");
     return () => {
       toastTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+      if (countdownTimeoutRef.current) clearTimeout(countdownTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    countdownTimeoutRef.current = setTimeout(() => {
+      setCountdown((prev) => (prev !== null && prev > 0 ? prev - 1 : null));
+      countdownTimeoutRef.current = null;
+    }, 1000);
+    return () => {
+      if (countdownTimeoutRef.current) {
+        clearTimeout(countdownTimeoutRef.current);
+        countdownTimeoutRef.current = null;
+      }
+    };
+  }, [countdown]);
+
+  useEffect(() => {
+    if (countdown === 0) {
+      setCountdown(null);
+      startMediaRecorderWithStream();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown]);
 
   // Cleanup recorded video URL on unmount
   useEffect(() => {
@@ -235,9 +333,36 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     };
   }, [recordedVideoURL]);
 
-
   return (
     <div className={`onscreen-recorder-container ${className}`}>
+      {isPreparing && countdown !== null && (
+        <div
+          className="onscreen-recorder-countdown-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-live="polite"
+          aria-label={`Recording starts in ${countdown} seconds`}
+        >
+          <div className="onscreen-recorder-countdown-backdrop" />
+          <div className="onscreen-recorder-countdown-content">
+            <p className="onscreen-recorder-countdown-label">
+              {countdown > 0 ? "Recording starts in" : ""}
+            </p>
+            <div className="onscreen-recorder-countdown-number" key={countdown}>
+              {countdown > 0 ? countdown : "Go!"}
+            </div>
+            <p className="onscreen-recorder-countdown-hint">Screen selected – get ready</p>
+            <button
+              type="button"
+              onClick={cancelCountdown}
+              className="onscreen-recorder-button onscreen-recorder-button-secondary onscreen-recorder-countdown-cancel"
+              aria-label="Cancel countdown"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       <div className="onscreen-recorder-wrapper">
         <div className="onscreen-recorder-header">
           <h1 className="onscreen-recorder-title">
@@ -255,7 +380,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
             <div className="onscreen-recorder-controls">
               {/* Control Buttons */}
               <div className="onscreen-recorder-button-group">
-                {!isRecording ? (
+                {!isRecording && !isPreparing ? (
                   <>
                     <button onClick={startRecording} className="onscreen-recorder-button onscreen-recorder-button-primary">
                       <PlayIcon className="onscreen-recorder-button-icon" size={20} />
@@ -269,6 +394,11 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
                       {micEnabled ? <MicIcon className="onscreen-recorder-button-icon" size={20} /> : <MicOffIcon className="onscreen-recorder-button-icon" size={20} />}
                     </button>
                   </>
+                ) : isPreparing ? (
+                  <div className="onscreen-recorder-preparing-indicator">
+                    <div className="onscreen-recorder-preparing-dot" />
+                    <p className="onscreen-recorder-preparing-text">Preparing…</p>
+                  </div>
                 ) : (
                   <button onClick={stopRecording} className="onscreen-recorder-button onscreen-recorder-button-danger onscreen-recorder-recording">
                     <SquareIcon className="onscreen-recorder-button-icon" size={20} />
@@ -305,7 +435,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
                 </div>
               )}
 
-              {!recordedVideoURL && !isRecording && (
+              {!recordedVideoURL && !isRecording && !isPreparing && (
                 <div className="onscreen-recorder-empty-state">
                   <VideoIcon className="onscreen-recorder-empty-icon" size={64} />
                   <p className="onscreen-recorder-empty-text">No recording yet</p>
@@ -344,20 +474,20 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
                       <span className="onscreen-recorder-log-timestamp">[{log.timestamp}]</span>
                       <span
                         className={`onscreen-recorder-log-icon ${log.type === "error"
-                            ? "onscreen-recorder-log-icon-error"
-                            : log.type === "success"
-                              ? "onscreen-recorder-log-icon-success"
-                              : "onscreen-recorder-log-icon-info"
+                          ? "onscreen-recorder-log-icon-error"
+                          : log.type === "success"
+                            ? "onscreen-recorder-log-icon-success"
+                            : "onscreen-recorder-log-icon-info"
                           }`}
                       >
                         {log.type === "error" ? "❌" : log.type === "success" ? "✓" : "ℹ"}
                       </span>
                       <span
                         className={`onscreen-recorder-log-message ${log.type === "error"
-                            ? "onscreen-recorder-log-message-error"
-                            : log.type === "success"
-                              ? "onscreen-recorder-log-message-success"
-                              : "onscreen-recorder-log-message-info"
+                          ? "onscreen-recorder-log-message-error"
+                          : log.type === "success"
+                            ? "onscreen-recorder-log-message-success"
+                            : "onscreen-recorder-log-message-info"
                           }`}
                       >
                         {log.message}
