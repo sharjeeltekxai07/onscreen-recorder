@@ -1,11 +1,12 @@
-import React from "react";
+import React, { memo } from "react";
 
 interface IconProps {
   className?: string;
   size?: number;
 }
 
-export const VideoIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
+export const VideoIcon = memo<IconProps>(function VideoIcon({ className = "", size = 24 }) {
+  return (
   <svg
     className={className}
     width={size}
@@ -20,9 +21,11 @@ export const VideoIcon: React.FC<IconProps> = ({ className = "", size = 24 }) =>
     <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10" />
     <line x1="1" y1="1" x2="23" y2="23" />
   </svg>
-);
+  );
+});
 
-export const PlayIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
+export const PlayIcon = memo<IconProps>(function PlayIcon({ className = "", size = 24 }) {
+  return (
   <svg
     className={className}
     width={size}
@@ -36,9 +39,11 @@ export const PlayIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => 
   >
     <polygon points="5 3 19 12 5 21 5 3" />
   </svg>
-);
+  );
+});
 
-export const SquareIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
+export const SquareIcon = memo<IconProps>(function SquareIcon({ className = "", size = 24 }) {
+  return (
   <svg
     className={className}
     width={size}
@@ -52,9 +57,11 @@ export const SquareIcon: React.FC<IconProps> = ({ className = "", size = 24 }) =
   >
     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
   </svg>
-);
+  );
+});
 
-export const DownloadIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
+export const DownloadIcon = memo<IconProps>(function DownloadIcon({ className = "", size = 24 }) {
+  return (
   <svg
     className={className}
     width={size}
@@ -70,9 +77,11 @@ export const DownloadIcon: React.FC<IconProps> = ({ className = "", size = 24 })
     <polyline points="7 10 12 15 17 10" />
     <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
-);
+  );
+});
 
-export const UploadIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
+export const UploadIcon = memo<IconProps>(function UploadIcon({ className = "", size = 24 }) {
+  return (
   <svg
     className={className}
     width={size}
@@ -88,9 +97,11 @@ export const UploadIcon: React.FC<IconProps> = ({ className = "", size = 24 }) =
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
-);
+  );
+});
 
-export const TrashIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
+export const TrashIcon = memo<IconProps>(function TrashIcon({ className = "", size = 24 }) {
+  return (
   <svg
     className={className}
     width={size}
@@ -107,9 +118,11 @@ export const TrashIcon: React.FC<IconProps> = ({ className = "", size = 24 }) =>
     <line x1="10" y1="11" x2="10" y2="17" />
     <line x1="14" y1="11" x2="14" y2="17" />
   </svg>
-);
+  );
+});
 
-export const MicIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
+export const MicIcon = memo<IconProps>(function MicIcon({ className = "", size = 24 }) {
+  return (
   <svg
     className={className}
     width={size}
@@ -126,9 +139,11 @@ export const MicIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
     <line x1="12" y1="19" x2="12" y2="23" />
     <line x1="8" y1="23" x2="16" y2="23" />
   </svg>
-);
+  );
+});
 
-export const MicOffIcon: React.FC<IconProps> = ({ className = "", size = 24 }) => (
+export const MicOffIcon = memo<IconProps>(function MicOffIcon({ className = "", size = 24 }) {
+  return (
   <svg
     className={className}
     width={size}
@@ -146,4 +161,5 @@ export const MicOffIcon: React.FC<IconProps> = ({ className = "", size = 24 }) =
     <line x1="12" y1="19" x2="12" y2="23" />
     <line x1="8" y1="23" x2="16" y2="23" />
   </svg>
-);
+  );
+});

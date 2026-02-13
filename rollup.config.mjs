@@ -3,6 +3,7 @@ import commonjs from "@rollup/plugin-commonjs";
 import typescript from "@rollup/plugin-typescript";
 import postcss from "rollup-plugin-postcss";
 import peerDepsExternal from "rollup-plugin-peer-deps-external";
+import terser from "@rollup/plugin-terser";
 import { dts } from "rollup-plugin-dts";
 import { readFileSync } from "fs";
 const packageJson = JSON.parse(readFileSync("./package.json", "utf-8"));
@@ -19,28 +20,26 @@ export default [
         format: "cjs",
         sourcemap: true,
         exports: "named",
+        compact: true,
       },
       {
         file: packageJson.module,
         format: "esm",
         sourcemap: true,
         exports: "named",
+        compact: true,
       },
     ],
     plugins: [
       peerDepsExternal(),
-      resolve({
-        browser: true,
-      }),
+      resolve({ browser: true }),
       commonjs(),
       typescript({
         tsconfig: "./tsconfig.lib.json",
         declaration: false,
       }),
-      postcss({
-        extract: "index.css",
-        minimize: true,
-      }),
+      postcss({ extract: "index.css", minimize: true }),
+      terser({ format: { comments: false }, compress: { drop_console: false } }),
     ],
     external,
   },

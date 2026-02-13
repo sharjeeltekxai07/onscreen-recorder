@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   VideoIcon,
   SquareIcon,
@@ -10,6 +10,9 @@ import {
   MicOffIcon,
 } from "./icons";
 import "./ScreenRecorder.css";
+
+const MAX_CONSOLE_LOGS = 100;
+const CHUNK_LOG_EVERY_N = 5;
 
 export interface ScreenRecorderProps {
   /** Callback when recording starts */
@@ -51,16 +54,19 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   const chunksRef = useRef<Blob[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const recordedBlobRef = useRef<Blob | null>(null);
-  const toastTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const micStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const combinedStreamRef = useRef<MediaStream | null>(null);
   const countdownTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chunkCountRef = useRef(0);
 
-  const addLog = (message: string, type: "info" | "success" | "error" = "info") => {
+  const addLog = useCallback((message: string, type: "info" | "success" | "error" = "info") => {
     const timestamp = new Date().toLocaleTimeString();
-    setConsoleLogs((prev) => [...prev, { message, type, timestamp }]);
-  };
+    setConsoleLogs((prev) => {
+      const next = [...prev, { message, type, timestamp }];
+      return next.length > MAX_CONSOLE_LOGS ? next.slice(-MAX_CONSOLE_LOGS) : next;
+    });
+  }, []);
 
   const requestMicPermission = async (): Promise<MediaStream | null> => {
     try {
@@ -79,21 +85,21 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     }
   };
 
-  const releaseAllStreams = () => {
+  const releaseAllStreams = useCallback(() => {
     if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
     }
     if (micStreamRef.current) {
-      micStreamRef.current.getTracks().forEach((track) => track.stop());
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
       micStreamRef.current = null;
       setHasMicPermission(false);
     }
     if (combinedStreamRef.current) {
-      combinedStreamRef.current.getTracks().forEach((track) => track.stop());
+      combinedStreamRef.current.getTracks().forEach((t) => t.stop());
       combinedStreamRef.current = null;
     }
-  };
+  }, []);
 
   const acquireStreamAndStartCountdown = async () => {
     try {
@@ -182,6 +188,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     }
 
     chunksRef.current = [];
+    chunkCountRef.current = 0;
     mediaRecorderRef.current = new MediaRecorder(stream, {
       mimeType: "video/webm;codecs=vp8,opus",
     });
@@ -189,7 +196,10 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     mediaRecorderRef.current.ondataavailable = (e) => {
       if (e.data.size > 0) {
         chunksRef.current.push(e.data);
-        addLog(`Data chunk received: ${(e.data.size / 1024).toFixed(2)} KB`, "info");
+        chunkCountRef.current += 1;
+        if (chunkCountRef.current === 1 || chunkCountRef.current % CHUNK_LOG_EVERY_N === 0) {
+          addLog(`Data chunk ${chunkCountRef.current}: ${(e.data.size / 1024).toFixed(1)} KB`, "info");
+        }
       }
     };
 
@@ -230,11 +240,11 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     if (onRecordingStart) onRecordingStart();
   };
 
-  const startRecording = () => {
+  const startRecording = useCallback(() => {
     acquireStreamAndStartCountdown();
-  };
+  }, []);
 
-  const cancelCountdown = () => {
+  const cancelCountdown = useCallback(() => {
     if (countdownTimeoutRef.current) {
       clearTimeout(countdownTimeoutRef.current);
       countdownTimeoutRef.current = null;
@@ -243,17 +253,17 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     setIsPreparing(false);
     setCountdown(null);
     addLog("Countdown cancelled", "info");
-  };
+  }, [releaseAllStreams, addLog]);
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       addLog("Stop recording requested", "info");
     }
-  };
+  }, [isRecording, addLog]);
 
-  const downloadVideo = () => {
+  const downloadVideo = useCallback(() => {
     if (recordedVideoURL && recordedBlobRef.current) {
       const a = document.createElement("a");
       a.href = recordedVideoURL;
@@ -264,18 +274,18 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
         onDownload(recordedBlobRef.current);
       }
     }
-  };
+  }, [recordedVideoURL, onDownload, addLog]);
 
-  const clearRecording = () => {
+  const clearRecording = useCallback(() => {
     if (recordedVideoURL) {
       URL.revokeObjectURL(recordedVideoURL);
       setRecordedVideoURL(null);
       recordedBlobRef.current = null;
       addLog("Recording cleared", "info");
     }
-  };
+  }, [recordedVideoURL, addLog]);
 
-  const handleUpload = () => {
+  const handleUpload = useCallback(() => {
     if (!recordedBlobRef.current) {
       addLog("No video to upload", "error");
       return;
@@ -287,22 +297,25 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     } else {
       addLog("No upload handler provided. Implement onUpload prop to handle uploads.", "info");
     }
-  };
+  }, [onUpload, addLog]);
 
-  const clearConsole = () => {
+  const clearConsole = useCallback(() => {
     setConsoleLogs([]);
-  };
+  }, []);
 
   useEffect(() => {
     addLog("Screen Recorder initialized", "success");
     return () => {
-      toastTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
       if (countdownTimeoutRef.current) clearTimeout(countdownTimeoutRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [addLog]);
 
   useEffect(() => {
+    if (countdown === 0) {
+      setCountdown(null);
+      startMediaRecorderWithStream();
+      return;
+    }
     if (countdown === null || countdown <= 0) return;
     countdownTimeoutRef.current = setTimeout(() => {
       setCountdown((prev) => (prev !== null && prev > 0 ? prev - 1 : null));
@@ -314,13 +327,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
         countdownTimeoutRef.current = null;
       }
     };
-  }, [countdown]);
-
-  useEffect(() => {
-    if (countdown === 0) {
-      setCountdown(null);
-      startMediaRecorderWithStream();
-    }
+    // startMediaRecorderWithStream is stable (refs/state); only run when countdown changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdown]);
 
