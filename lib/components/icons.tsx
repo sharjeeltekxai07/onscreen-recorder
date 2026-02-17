@@ -163,3 +163,41 @@ export const MicOffIcon = memo<IconProps>(function MicOffIcon({ className = "", 
   </svg>
   );
 });
+
+export const CameraIcon = memo<IconProps>(function CameraIcon({ className = "", size = 24 }) {
+  return (
+  <svg
+    className={className}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+  );
+});
+
+export const CameraOffIcon = memo<IconProps>(function CameraOffIcon({ className = "", size = 24 }) {
+  return (
+  <svg
+    className={className}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="1" y1="1" x2="23" y2="23" />
+    <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34m-7.72-2.06a4 4 0 1 1-5.56-5.56" />
+  </svg>
+  );
+});

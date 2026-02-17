@@ -79,8 +79,9 @@ function App() {
 | `onDownload`        | `(blob: Blob) => void`   | `undefined` | Callback fired when video is downloaded                                                          |
 | `onUpload`          | `(blob: Blob) => void`   | `undefined` | Callback fired when upload button is clicked, receives the video blob for custom upload handling |
 | `onError`           | `(error: Error) => void` | `undefined` | Callback fired when an error occurs                                                              |
-| `defaultMicEnabled` | `boolean`                | `true`      | Whether microphone is enabled by default                                                         |
-| `countdownSeconds`  | `number`                 | `3`         | Seconds to count down (3, 2, 1) after you select your screen; then recording starts. Use `0` to start immediately. |
+| `defaultMicEnabled`   | `boolean` | `true`  | Whether microphone is enabled by default |
+| `defaultCameraEnabled` | `boolean` | `false` | Whether camera (webcam) is enabled by default – records as PiP in the screen video and as a separate camera-only video file |
+| `countdownSeconds`   | `number`                 | `3`         | Seconds to count down (3, 2, 1) after you select your screen; then recording starts. Use `0` to start immediately. |
 | `className`         | `string`                 | `""`        | Additional CSS class name for the container                                                      |
 
 ## Examples
