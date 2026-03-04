@@ -82,9 +82,25 @@ function App() {
 | `defaultMicEnabled`   | `boolean` | `true`  | Whether microphone is enabled by default |
 | `defaultCameraEnabled` | `boolean` | `false` | Whether camera (webcam) is enabled by default – records as PiP in the screen video and as a separate camera-only video file |
 | `countdownSeconds`   | `number`                 | `3`         | Seconds to count down (3, 2, 1) after you select your screen; then recording starts. Use `0` to start immediately. |
+| `showHeader`        | `boolean`                 | `true`      | Show the main "Screen Recorder" header. Set to `false` when embedding inside your own layout (e.g. sidebar, modal). |
+| `showConsole`       | `boolean`                 | `false`     | Show the debug console panel. Set to `true` for development; keep `false` for a cleaner end-user UI. |
 | `className`         | `string`                 | `""`        | Additional CSS class name for the container                                                      |
 
 ## Examples
+
+### Embed in your app (no header, no console)
+
+Use a compact UI when the recorder lives inside your page (e.g. support widget, settings panel):
+
+```tsx
+<ScreenRecorder
+  showHeader={false}
+  showConsole={false}
+  defaultMicEnabled={true}
+/>
+```
+
+With `showHeader={false}`, the container no longer uses full-page height and uses less padding so it fits in a card or sidebar. Use `showConsole={true}` only when you need to debug.
 
 ### With Custom Callbacks
 

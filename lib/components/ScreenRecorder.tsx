@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   VideoIcon,
   SquareIcon,
@@ -18,6 +18,13 @@ const CHUNK_LOG_EVERY_N = 5;
 const CAMERA_PIP_SIZE = 0.2;
 const CAMERA_PIP_INSET = 16;
 const CAPTURE_FPS = 30;
+const MIME_VIDEO = "video/webm;codecs=vp8,opus";
+const MIME_VIDEO_VP8 = "video/webm;codecs=vp8";
+
+type LogType = "info" | "success" | "error";
+const LOG_ICON: Record<LogType, string> = { error: "❌", success: "✓", info: "ℹ" };
+const logIconClass = (t: LogType) => `onscreen-recorder-log-icon onscreen-recorder-log-icon-${t}`;
+const logMsgClass = (t: LogType) => `onscreen-recorder-log-message onscreen-recorder-log-message-${t}`;
 
 export interface ScreenRecorderProps {
   /** Callback when recording starts */
@@ -36,6 +43,10 @@ export interface ScreenRecorderProps {
   defaultCameraEnabled?: boolean;
   /** Seconds to count down after user selects screen (3, 2, 1 then record). Set to 0 to record immediately after selection. */
   countdownSeconds?: number;
+  /** Show the main "Screen Recorder" header. Set to false when embedding in your own layout. */
+  showHeader?: boolean;
+  /** Show the debug console panel. Set to true for development; keep false for a cleaner end-user UI. */
+  showConsole?: boolean;
   /** Custom class name for the container */
   className?: string;
 }
@@ -49,12 +60,14 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   defaultMicEnabled = true,
   defaultCameraEnabled = false,
   countdownSeconds = 3,
+  showHeader = true,
+  showConsole = false,
   className = "",
 }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedVideoURL, setRecordedVideoURL] = useState<string | null>(null);
   const [recordedCameraURL, setRecordedCameraURL] = useState<string | null>(null);
-  const [consoleLogs, setConsoleLogs] = useState<Array<{ message: string; type: string; timestamp: string }>>([]);
+  const [consoleLogs, setConsoleLogs] = useState<Array<{ message: string; type: LogType; timestamp: string }>>([]);
   const [micEnabled, setMicEnabled] = useState(defaultMicEnabled);
   const [cameraEnabled, setCameraEnabled] = useState(defaultCameraEnabled);
   const [hasMicPermission, setHasMicPermission] = useState(false);
@@ -79,7 +92,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   const canvasStreamRef = useRef<MediaStream | null>(null);
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
 
-  const addLog = useCallback((message: string, type: "info" | "success" | "error" = "info") => {
+  const addLog = useCallback((message: string, type: LogType = "info") => {
     const timestamp = new Date().toLocaleTimeString();
     setConsoleLogs((prev) => {
       const next = [...prev, { message, type, timestamp }];
@@ -87,41 +100,38 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     });
   }, []);
 
-  const requestMicPermission = async (): Promise<MediaStream | null> => {
-    try {
-      addLog("Requesting microphone permission...", "info");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      micStreamRef.current = stream;
-      setHasMicPermission(true);
-      addLog("Microphone permission granted", "success");
-      return stream;
-    } catch (err) {
-      const error = err as Error;
-      addLog(`Microphone permission denied: ${error.message}`, "error");
-      setHasMicPermission(false);
-      if (onError) onError(error);
-      return null;
-    }
-  };
-
-  const requestCameraPermission = async (): Promise<MediaStream | null> => {
-    try {
-      addLog("Requesting camera permission...", "info");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      cameraStreamRef.current = stream;
-      setHasCameraPermission(true);
-      addLog("Camera permission granted", "success");
-      return stream;
-    } catch (err) {
-      const error = err as Error;
-      addLog(`Camera permission denied: ${error.message}`, "error");
-      setHasCameraPermission(false);
-      if (onError) onError(error);
-      return null;
-    }
-  };
+  const requestMediaPermission = useCallback(
+    async (kind: "audio" | "video"): Promise<MediaStream | null> => {
+      const isAudio = kind === "audio";
+      const label = isAudio ? "Microphone" : "Camera";
+      try {
+        addLog(`Requesting ${label.toLowerCase()} permission...`, "info");
+        const stream = await navigator.mediaDevices.getUserMedia(isAudio ? { audio: true } : { video: true });
+        if (isAudio) {
+          micStreamRef.current = stream;
+          setHasMicPermission(true);
+        } else {
+          cameraStreamRef.current = stream;
+          setHasCameraPermission(true);
+        }
+        addLog(`${label} permission granted`, "success");
+        return stream;
+      } catch (err) {
+        const error = err as Error;
+        addLog(`${label} permission denied: ${error.message}`, "error");
+        if (isAudio) setHasMicPermission(false);
+        else setHasCameraPermission(false);
+        if (onError) onError(error);
+        return null;
+      }
+    },
+    [addLog, onError]
+  );
+  const requestMicPermission = () => requestMediaPermission("audio");
+  const requestCameraPermission = () => requestMediaPermission("video");
 
   const releaseAllStreams = useCallback(() => {
+    if (cameraRecorderRef.current?.state === "recording") cameraRecorderRef.current.stop();
     if (drawLoopIdRef.current != null) {
       cancelAnimationFrame(drawLoopIdRef.current);
       drawLoopIdRef.current = null;
@@ -299,9 +309,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
 
     chunksRef.current = [];
     chunkCountRef.current = 0;
-    mediaRecorderRef.current = new MediaRecorder(stream, {
-      mimeType: "video/webm;codecs=vp8,opus",
-    });
+    mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: MIME_VIDEO });
 
     mediaRecorderRef.current.ondataavailable = (e) => {
       if (e.data.size > 0) {
@@ -316,12 +324,12 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     const camStream = cameraStreamRef.current;
     if (camStream && camStream.getVideoTracks().length > 0) {
       cameraChunksRef.current = [];
-      cameraRecorderRef.current = new MediaRecorder(camStream, { mimeType: "video/webm;codecs=vp8" });
+      cameraRecorderRef.current = new MediaRecorder(camStream, { mimeType: MIME_VIDEO_VP8 });
       cameraRecorderRef.current.ondataavailable = (e) => {
         if (e.data.size > 0) cameraChunksRef.current.push(e.data);
       };
       cameraRecorderRef.current.onstop = () => {
-        const camBlob = new Blob(cameraChunksRef.current, { type: "video/webm" });
+        const camBlob = new Blob(cameraChunksRef.current, { type: MIME_VIDEO_VP8 });
         recordedCameraBlobRef.current = camBlob;
         setRecordedCameraURL(URL.createObjectURL(camBlob));
         addLog(`Camera video ready: ${(camBlob.size / 1024).toFixed(1)} KB`, "success");
@@ -334,7 +342,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
       if (cameraRecorderRef.current?.state === "recording") {
         cameraRecorderRef.current.stop();
       }
-      const blob = new Blob(chunksRef.current, { type: "video/webm" });
+      const blob = new Blob(chunksRef.current, { type: MIME_VIDEO });
       const url = URL.createObjectURL(blob);
       setRecordedVideoURL(url);
       recordedBlobRef.current = blob;
@@ -395,28 +403,40 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     }
   }, [isRecording, addLog]);
 
+  const triggerDownload = useCallback(
+    (url: string, filename: string, logMessage: string, blob: Blob | null, onDownloadBlob?: (b: Blob) => void) => {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      addLog(logMessage, "success");
+      if (blob && onDownloadBlob) onDownloadBlob(blob);
+    },
+    [addLog]
+  );
+
   const downloadVideo = useCallback(() => {
     if (recordedVideoURL && recordedBlobRef.current) {
-      const a = document.createElement("a");
-      a.href = recordedVideoURL;
-      a.download = `screen-recording-${Date.now()}.webm`;
-      a.click();
-      addLog("Video download initiated", "success");
-      if (onDownload && recordedBlobRef.current) {
-        onDownload(recordedBlobRef.current);
-      }
+      triggerDownload(
+        recordedVideoURL,
+        `screen-recording-${Date.now()}.webm`,
+        "Video download initiated",
+        recordedBlobRef.current,
+        onDownload ?? undefined
+      );
     }
-  }, [recordedVideoURL, onDownload, addLog]);
+  }, [recordedVideoURL, onDownload, triggerDownload]);
 
   const downloadCameraVideo = useCallback(() => {
     if (recordedCameraURL && recordedCameraBlobRef.current) {
-      const a = document.createElement("a");
-      a.href = recordedCameraURL;
-      a.download = `camera-recording-${Date.now()}.webm`;
-      a.click();
-      addLog("Camera video download initiated", "success");
+      triggerDownload(
+        recordedCameraURL,
+        `camera-recording-${Date.now()}.webm`,
+        "Camera video download initiated",
+        null
+      );
     }
-  }, [recordedCameraURL, addLog]);
+  }, [recordedCameraURL, triggerDownload]);
 
   const clearRecording = useCallback(() => {
     if (recordedVideoURL) {
@@ -449,6 +469,14 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   const clearConsole = useCallback(() => {
     setConsoleLogs([]);
   }, []);
+
+  const recordingStatusText = useMemo(
+    () =>
+      [micEnabled && hasMicPermission && "🎤 Mic", cameraEnabled && hasCameraPermission && "📷 Camera"]
+        .filter(Boolean)
+        .join(" · ") || "Screen only",
+    [micEnabled, hasMicPermission, cameraEnabled, hasCameraPermission]
+  );
 
   useEffect(() => {
     addLog("Screen Recorder initialized", "success");
@@ -497,7 +525,9 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   }, [recordedVideoURL, recordedCameraURL]);
 
   return (
-    <div className={`onscreen-recorder-container ${className}`}>
+    <div
+      className={`onscreen-recorder-container ${!showHeader ? "onscreen-recorder-embed " : ""}${className}`.trim()}
+    >
       {isPreparing && countdown !== null && (
         <div
           className="onscreen-recorder-countdown-overlay"
@@ -527,55 +557,63 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
         </div>
       )}
       <div className="onscreen-recorder-wrapper">
-        <div className="onscreen-recorder-header">
-          <h1 className="onscreen-recorder-title">
-            <VideoIcon className="onscreen-recorder-title-icon" size={40} />
-            Screen Recorder
-          </h1>
-          <p className="onscreen-recorder-subtitle">Record your screen and view the playback</p>
-        </div>
+        {showHeader && (
+          <div className="onscreen-recorder-header">
+            <h1 className="onscreen-recorder-title">
+              <VideoIcon className="onscreen-recorder-title-icon" size={40} />
+              Screen Recorder
+            </h1>
+            <p className="onscreen-recorder-subtitle">Record your screen with optional mic and camera</p>
+          </div>
+        )}
 
-        <div className="onscreen-recorder-grid">
+        <div className={`onscreen-recorder-grid ${showConsole ? "" : "onscreen-recorder-grid-single"}`}>
           {/* Recording Controls & Preview */}
           <div className="onscreen-recorder-card">
             <h2 className="onscreen-recorder-card-title">Recording</h2>
+            <p className="onscreen-recorder-card-hint">Choose mic and camera, then start. You’ll pick the screen to share.</p>
 
             <div className="onscreen-recorder-controls">
-              {/* Control Buttons */}
-              <div className="onscreen-recorder-button-group">
+              {!isRecording && !isPreparing && (
+                <div className="onscreen-recorder-toggles">
+                  <button
+                    onClick={() => setMicEnabled(!micEnabled)}
+                    className={`onscreen-recorder-toggle ${micEnabled ? "onscreen-recorder-toggle-on" : ""}`}
+                    title={micEnabled ? "Microphone on" : "Microphone off"}
+                    type="button"
+                    aria-pressed={micEnabled}
+                  >
+                    {micEnabled ? <MicIcon size={18} /> : <MicOffIcon size={18} />}
+                    <span>Mic</span>
+                  </button>
+                  <button
+                    onClick={handleCameraButtonClick}
+                    className={`onscreen-recorder-toggle ${cameraEnabled ? "onscreen-recorder-toggle-on" : ""}`}
+                    title={cameraEnabled ? "Camera on" : "Enable camera"}
+                    type="button"
+                    aria-pressed={cameraEnabled}
+                  >
+                    {cameraEnabled ? <CameraIcon size={18} /> : <CameraOffIcon size={18} />}
+                    <span>Camera</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="onscreen-recorder-button-group onscreen-recorder-actions">
                 {!isRecording && !isPreparing ? (
-                  <>
-                    <button onClick={startRecording} className="onscreen-recorder-button onscreen-recorder-button-primary">
-                      <PlayIcon className="onscreen-recorder-button-icon" size={20} />
-                      Start Recording
-                    </button>
-                    <button
-                      onClick={() => setMicEnabled(!micEnabled)}
-                      className={`onscreen-recorder-button ${micEnabled ? "onscreen-recorder-button-success" : "onscreen-recorder-button-secondary"}`}
-                      title={micEnabled ? "Microphone on" : "Microphone off"}
-                      type="button"
-                    >
-                      {micEnabled ? <MicIcon className="onscreen-recorder-button-icon" size={20} /> : <MicOffIcon className="onscreen-recorder-button-icon" size={20} />}
-                    </button>
-                    <button
-                      onClick={handleCameraButtonClick}
-                      className={`onscreen-recorder-button ${cameraEnabled ? "onscreen-recorder-button-success" : "onscreen-recorder-button-secondary"}`}
-                      title={cameraEnabled ? "Camera on (PiP + separate file)" : "Enable camera – record as PiP and separate video"}
-                      type="button"
-                    >
-                      {cameraEnabled ? <CameraIcon className="onscreen-recorder-button-icon" size={20} /> : <CameraOffIcon className="onscreen-recorder-button-icon" size={20} />}
-                      <span className="onscreen-recorder-button-label">{cameraEnabled ? "Camera on" : "Camera"}</span>
-                    </button>
-                  </>
+                  <button onClick={startRecording} className="onscreen-recorder-button onscreen-recorder-button-primary" type="button">
+                    <PlayIcon className="onscreen-recorder-button-icon" size={20} />
+                    Start recording
+                  </button>
                 ) : isPreparing ? (
                   <div className="onscreen-recorder-preparing-indicator">
                     <div className="onscreen-recorder-preparing-dot" />
-                    <p className="onscreen-recorder-preparing-text">Preparing…</p>
+                    <p className="onscreen-recorder-preparing-text">Select your screen in the browser dialog…</p>
                   </div>
                 ) : (
-                  <button onClick={stopRecording} className="onscreen-recorder-button onscreen-recorder-button-danger onscreen-recorder-recording">
+                  <button onClick={stopRecording} className="onscreen-recorder-button onscreen-recorder-button-danger onscreen-recorder-recording" type="button">
                     <SquareIcon className="onscreen-recorder-button-icon" size={20} />
-                    Stop Recording
+                    Stop recording
                   </button>
                 )}
               </div>
@@ -600,7 +638,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
                   <h3 className="onscreen-recorder-video-title">Screen recording</h3>
                   <video ref={videoRef} src={recordedVideoURL} controls className="onscreen-recorder-video" />
 
-                  <div className="onscreen-recorder-button-group">
+                  <div className="onscreen-recorder-toolbar" role="toolbar" aria-label="Recording actions">
                     <button onClick={downloadVideo} className="onscreen-recorder-button onscreen-recorder-button-success" type="button">
                       <DownloadIcon className="onscreen-recorder-button-icon" size={16} />
                       Download screen
@@ -635,9 +673,9 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
 
               {!recordedVideoURL && !isRecording && !isPreparing && (
                 <div className="onscreen-recorder-empty-state">
-                  <VideoIcon className="onscreen-recorder-empty-icon" size={64} />
+                  <VideoIcon className="onscreen-recorder-empty-icon" size={48} aria-hidden />
                   <p className="onscreen-recorder-empty-text">No recording yet</p>
-                  <p className="onscreen-recorder-empty-subtext">Click "Start Recording" to begin</p>
+                  <p className="onscreen-recorder-empty-subtext">Use the options above and click Start recording</p>
                 </div>
               )}
 
@@ -645,57 +683,37 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
                 <div className="onscreen-recorder-recording-indicator">
                   <div className="onscreen-recorder-recording-dot" />
                   <p className="onscreen-recorder-recording-text">Recording…</p>
-                  <p className="onscreen-recorder-recording-subtext">
-                    {[micEnabled && hasMicPermission && "🎤 Mic", cameraEnabled && hasCameraPermission && "📷 Camera"].filter(Boolean).join(" · ") || "Screen only"}
-                  </p>
+                  <p className="onscreen-recorder-recording-subtext">{recordingStatusText}</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Console Logs */}
-          <div className="onscreen-recorder-card">
-            <div className="onscreen-recorder-console-header">
-              <h2 className="onscreen-recorder-card-title">Console</h2>
-              <button onClick={clearConsole} className="onscreen-recorder-button-small">
-                Clear
-              </button>
+          {showConsole && (
+            <div className="onscreen-recorder-card">
+              <div className="onscreen-recorder-console-header">
+                <h2 className="onscreen-recorder-card-title">Console</h2>
+                <button onClick={clearConsole} className="onscreen-recorder-button-small" type="button">
+                  Clear
+                </button>
+              </div>
+              <div className="onscreen-recorder-console">
+                {consoleLogs.length === 0 ? (
+                  <p className="onscreen-recorder-console-empty">Logs appear here when enabled.</p>
+                ) : (
+                  <div className="onscreen-recorder-logs">
+                    {consoleLogs.map((log, index) => (
+                      <div key={index} className="onscreen-recorder-log">
+                        <span className="onscreen-recorder-log-timestamp">[{log.timestamp}]</span>
+                        <span className={logIconClass(log.type)}>{LOG_ICON[log.type]}</span>
+                        <span className={logMsgClass(log.type)}>{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-
-            <div className="onscreen-recorder-console">
-              {consoleLogs.length === 0 ? (
-                <p className="onscreen-recorder-console-empty">Console logs will appear here...</p>
-              ) : (
-                <div className="onscreen-recorder-logs">
-                  {consoleLogs.map((log, index) => (
-                    <div key={index} className="onscreen-recorder-log">
-                      <span className="onscreen-recorder-log-timestamp">[{log.timestamp}]</span>
-                      <span
-                        className={`onscreen-recorder-log-icon ${log.type === "error"
-                          ? "onscreen-recorder-log-icon-error"
-                          : log.type === "success"
-                            ? "onscreen-recorder-log-icon-success"
-                            : "onscreen-recorder-log-icon-info"
-                          }`}
-                      >
-                        {log.type === "error" ? "❌" : log.type === "success" ? "✓" : "ℹ"}
-                      </span>
-                      <span
-                        className={`onscreen-recorder-log-message ${log.type === "error"
-                          ? "onscreen-recorder-log-message-error"
-                          : log.type === "success"
-                            ? "onscreen-recorder-log-message-success"
-                            : "onscreen-recorder-log-message-info"
-                          }`}
-                      >
-                        {log.message}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
