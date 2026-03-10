@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import {
   VideoIcon,
   SquareIcon,
@@ -51,7 +51,7 @@ export interface ScreenRecorderProps {
   className?: string;
 }
 
-export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
+const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   onRecordingStart,
   onRecordingStop,
   onDownload,
@@ -92,13 +92,17 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
   const canvasStreamRef = useRef<MediaStream | null>(null);
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
 
-  const addLog = useCallback((message: string, type: LogType = "info") => {
-    const timestamp = new Date().toLocaleTimeString();
-    setConsoleLogs((prev) => {
-      const next = [...prev, { message, type, timestamp }];
-      return next.length > MAX_CONSOLE_LOGS ? next.slice(-MAX_CONSOLE_LOGS) : next;
-    });
-  }, []);
+  const addLog = useCallback(
+    (message: string, type: LogType = "info") => {
+      if (!showConsole) return;
+      const timestamp = new Date().toLocaleTimeString();
+      setConsoleLogs((prev) => {
+        const next = [...prev, { message, type, timestamp }];
+        return next.length > MAX_CONSOLE_LOGS ? next.slice(-MAX_CONSOLE_LOGS) : next;
+      });
+    },
+    [showConsole]
+  );
 
   const requestMediaPermission = useCallback(
     async (kind: "audio" | "video"): Promise<MediaStream | null> => {
@@ -127,8 +131,8 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     },
     [addLog, onError]
   );
-  const requestMicPermission = () => requestMediaPermission("audio");
-  const requestCameraPermission = () => requestMediaPermission("video");
+  const requestMicPermission = useCallback(() => requestMediaPermission("audio"), [requestMediaPermission]);
+  const requestCameraPermission = useCallback(() => requestMediaPermission("video"), [requestMediaPermission]);
 
   const releaseAllStreams = useCallback(() => {
     if (cameraRecorderRef.current?.state === "recording") cameraRecorderRef.current.stop();
@@ -212,7 +216,7 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     }
     const stream = await requestCameraPermission();
     if (stream) setCameraEnabled(true);
-  }, [cameraEnabled, addLog]);
+  }, [cameraEnabled, addLog, requestCameraPermission]);
 
   const acquireStreamAndStartCountdown = async () => {
     try {
@@ -719,3 +723,5 @@ export const ScreenRecorder: React.FC<ScreenRecorderProps> = ({
     </div>
   );
 };
+
+export const ScreenRecorder = memo(ScreenRecorderComponent);

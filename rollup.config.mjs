@@ -18,14 +18,14 @@ export default [
       {
         file: packageJson.main,
         format: "cjs",
-        sourcemap: true,
+        sourcemap: false,
         exports: "named",
         compact: true,
       },
       {
         file: packageJson.module,
         format: "esm",
-        sourcemap: true,
+        sourcemap: false,
         exports: "named",
         compact: true,
       },
@@ -39,7 +39,10 @@ export default [
         declaration: false,
       }),
       postcss({ extract: "index.css", minimize: true }),
-      terser({ format: { comments: false }, compress: { drop_console: false } }),
+      terser({
+        format: { comments: false },
+        compress: { drop_console: true, passes: 2 },
+      }),
     ],
     external,
   },
