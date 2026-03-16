@@ -39,8 +39,10 @@ export interface ScreenRecorderProps {
   onError?: (error: Error) => void;
   /** Enable/disable microphone by default */
   defaultMicEnabled?: boolean;
-  /** Enable/disable camera (webcam) by default – records as PiP and a separate camera video file */
+  /** Enable/disable camera (webcam) by default – records as PiP and a separate camera video file. Only used when showCamera is true. */
   defaultCameraEnabled?: boolean;
+  /** When false, camera toggle and camera recording are hidden; recording is screen (+ optional mic) only. Default true. */
+  showCamera?: boolean;
   /** Seconds to count down after user selects screen (3, 2, 1 then record). Set to 0 to record immediately after selection. */
   countdownSeconds?: number;
   /** Show the main "Screen Recorder" header. Set to false when embedding in your own layout. */
@@ -59,6 +61,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   onError,
   defaultMicEnabled = true,
   defaultCameraEnabled = false,
+  showCamera = true,
   countdownSeconds = 3,
   showHeader = true,
   showConsole = false,
@@ -231,7 +234,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       addLog("Screen selected. Starting countdown...", "success");
 
       let videoStream: MediaStream = screenStream;
-      if (cameraEnabled) {
+      if (showCamera && cameraEnabled) {
         let camStream = cameraStreamRef.current;
         if (!camStream) camStream = await requestCameraPermission();
         if (camStream) {
@@ -325,7 +328,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       }
     };
 
-    const camStream = cameraStreamRef.current;
+    const camStream = showCamera ? cameraStreamRef.current : null;
     if (camStream && camStream.getVideoTracks().length > 0) {
       cameraChunksRef.current = [];
       cameraRecorderRef.current = new MediaRecorder(camStream, { mimeType: MIME_VIDEO_VP8 });
@@ -476,10 +479,13 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
   const recordingStatusText = useMemo(
     () =>
-      [micEnabled && hasMicPermission && "🎤 Mic", cameraEnabled && hasCameraPermission && "📷 Camera"]
+      [
+        micEnabled && hasMicPermission && "🎤 Mic",
+        showCamera && cameraEnabled && hasCameraPermission && "📷 Camera",
+      ]
         .filter(Boolean)
         .join(" · ") || "Screen only",
-    [micEnabled, hasMicPermission, cameraEnabled, hasCameraPermission]
+    [micEnabled, hasMicPermission, showCamera, cameraEnabled, hasCameraPermission]
   );
 
   useEffect(() => {
@@ -575,7 +581,9 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
           {/* Recording Controls & Preview */}
           <div className="onscreen-recorder-card">
             <h2 className="onscreen-recorder-card-title">Recording</h2>
-            <p className="onscreen-recorder-card-hint">Choose mic and camera, then start. You’ll pick the screen to share.</p>
+            <p className="onscreen-recorder-card-hint">
+              {showCamera ? "Choose mic and camera, then start." : "Choose mic, then start."} You’ll pick the screen to share.
+            </p>
 
             <div className="onscreen-recorder-controls">
               {!isRecording && !isPreparing && (
@@ -590,16 +598,18 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
                     {micEnabled ? <MicIcon size={18} /> : <MicOffIcon size={18} />}
                     <span>Mic</span>
                   </button>
-                  <button
-                    onClick={handleCameraButtonClick}
-                    className={`onscreen-recorder-toggle ${cameraEnabled ? "onscreen-recorder-toggle-on" : ""}`}
-                    title={cameraEnabled ? "Camera on" : "Enable camera"}
-                    type="button"
-                    aria-pressed={cameraEnabled}
-                  >
-                    {cameraEnabled ? <CameraIcon size={18} /> : <CameraOffIcon size={18} />}
-                    <span>Camera</span>
-                  </button>
+                  {showCamera && (
+                    <button
+                      onClick={handleCameraButtonClick}
+                      className={`onscreen-recorder-toggle ${cameraEnabled ? "onscreen-recorder-toggle-on" : ""}`}
+                      title={cameraEnabled ? "Camera on" : "Enable camera"}
+                      type="button"
+                      aria-pressed={cameraEnabled}
+                    >
+                      {cameraEnabled ? <CameraIcon size={18} /> : <CameraOffIcon size={18} />}
+                      <span>Camera</span>
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -623,7 +633,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
               </div>
 
               {/* Camera live preview (when enabled, not recording) */}
-              {!isRecording && !isPreparing && cameraEnabled && hasCameraPermission && (
+              {showCamera && !isRecording && !isPreparing && cameraEnabled && hasCameraPermission && (
                 <div className="onscreen-recorder-camera-preview">
                   <p className="onscreen-recorder-camera-preview-label">Camera preview</p>
                   <video
