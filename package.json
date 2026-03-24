@@ -1,6 +1,6 @@
 {
   "name": "onscreen-recorder",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "A beautiful React component for screen recording with microphone support, custom styling, and built-in console logging",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -34,17 +34,7 @@
     "prepublishOnly": "npm run build:lib"
   },
   "keywords": [
-    "react",
-    "screen-recorder",
-    "screen-capture",
-    "recording",
-    "video",
-    "media-recorder",
-    "webcam",
-    "microphone",
-    "typescript",
-    "component",
-    "ui"
+    "react","video-recording","onscreen-recorder", "screen-recorder", "screen-capture", "recording", "video", "media-recorder", "webcam", "microphone", "typescript", "component", "ui"
   ],
   "author": "sharjeel884",
   "license": "MIT",
