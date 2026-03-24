@@ -1,6 +1,6 @@
 {
   "name": "onscreen-recorder",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A beautiful React component for screen recording with microphone support, custom styling, and built-in console logging",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -45,7 +45,7 @@
   "bugs": {
     "url": "https://github.com/sharjeel884/onscreen-recorder/issues"
   },
-  "homepage": "https://github.com/sharjeel884/onscreen-recorder#readme",
+  "homepage": "https://onscreen-recorder-jciaggdoq-runs1.vercel.app/",
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-dom": ">=16.8.0"

@@ -2,6 +2,10 @@
 
 This repo includes a real demo app in `example/`.
 
+Current hosted demo:
+
+- [https://onscreen-recorder-jciaggdoq-runs1.vercel.app/](https://onscreen-recorder-jciaggdoq-runs1.vercel.app/)
+
 ## Option A: Vercel (recommended)
 
 1. Push this repository to GitHub.

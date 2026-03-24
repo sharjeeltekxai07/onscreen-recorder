@@ -2,6 +2,8 @@
 
 A beautiful, feature-rich React component for screen recording with microphone support, custom styling, and built-in console logging.
 
+**Live Demo:** [https://onscreen-recorder-jciaggdoq-runs1.vercel.app/](https://onscreen-recorder-jciaggdoq-runs1.vercel.app/)
+
 ## Features
 
 - 🎥 **Screen Recording** - Record your screen with high-quality video
@@ -195,6 +197,7 @@ This will create the distributable files in the `dist/` directory.
 
 You can run or deploy the real demo app from `example/`.
 
+- Hosted demo: [https://onscreen-recorder-jciaggdoq-runs1.vercel.app/](https://onscreen-recorder-jciaggdoq-runs1.vercel.app/)
 - Deployment guide: see `DEMO_DEPLOY.md`
 - Local demo:
 
