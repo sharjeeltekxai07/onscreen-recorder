@@ -191,6 +191,19 @@ npm run build:lib
 
 This will create the distributable files in the `dist/` directory.
 
+## Live Demo
+
+You can run or deploy the real demo app from `example/`.
+
+- Deployment guide: see `DEMO_DEPLOY.md`
+- Local demo:
+
+```bash
+cd example
+npm install
+npm run dev
+```
+
 ### Running the Example
 
 ```bash
