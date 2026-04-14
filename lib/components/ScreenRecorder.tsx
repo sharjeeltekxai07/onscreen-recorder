@@ -3,6 +3,7 @@ import {
   VideoIcon,
   SquareIcon,
   PlayIcon,
+  PauseIcon,
   DownloadIcon,
   TrashIcon,
   UploadIcon,
@@ -77,6 +78,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const cameraRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -94,6 +96,8 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   const drawLoopIdRef = useRef<number | null>(null);
   const canvasStreamRef = useRef<MediaStream | null>(null);
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
+  const compositeScreenVideoRef = useRef<HTMLVideoElement | null>(null);
+  const compositeCameraVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const addLog = useCallback(
     (message: string, type: LogType = "info") => {

@@ -24,6 +24,25 @@ export const VideoIcon = memo<IconProps>(function VideoIcon({ className = "", si
   );
 });
 
+export const PauseIcon = memo<IconProps>(function PauseIcon({ className = "", size = 24 }) {
+  return (
+  <svg
+    className={className}
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="6" y="4" width="4" height="16" />
+    <rect x="14" y="4" width="4" height="16" />
+  </svg>
+  );
+});
+
 export const PlayIcon = memo<IconProps>(function PlayIcon({ className = "", size = 24 }) {
   return (
   <svg
