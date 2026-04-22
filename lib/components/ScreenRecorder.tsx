@@ -14,6 +14,29 @@ import {
 } from "./icons";
 import "./ScreenRecorder.css";
 
+// Inject Inter font
+if (typeof document !== "undefined") {
+  const fontId = "onscreen-recorder-font";
+  if (!document.getElementById(fontId)) {
+    const link = document.createElement("link");
+    link.id = fontId;
+    link.rel = "preconnect";
+    link.href = "https://fonts.googleapis.com";
+    document.head.appendChild(link);
+    
+    const link2 = document.createElement("link");
+    link2.rel = "preconnect";
+    link2.href = "https://fonts.gstatic.com";
+    link2.crossOrigin = "anonymous";
+    document.head.appendChild(link2);
+    
+    const link3 = document.createElement("link");
+    link3.rel = "stylesheet";
+    link3.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap";
+    document.head.appendChild(link3);
+  }
+}
+
 const MAX_CONSOLE_LOGS = 100;
 const CHUNK_LOG_EVERY_N = 5;
 const CAMERA_PIP_SIZE = 0.2;
@@ -638,7 +661,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
               {/* Camera live preview (when enabled, not recording) */}
               {showCamera && !isRecording && !isPreparing && cameraEnabled && hasCameraPermission && (
-                <div className="onscreen-recorder-camera-preview">
+                <div className="onscreen-recorder-camera-preview onscreen-recorder-fade-in">
                   <p className="onscreen-recorder-camera-preview-label">Camera preview</p>
                   <video
                     ref={cameraPreviewRef}
@@ -652,7 +675,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
               {/* Screen + PiP recorded video */}
               {recordedVideoURL && (
-                <div className="onscreen-recorder-video-section">
+                <div className="onscreen-recorder-video-section onscreen-recorder-fade-in">
                   <h3 className="onscreen-recorder-video-title">Screen recording</h3>
                   <video ref={videoRef} src={recordedVideoURL} controls className="onscreen-recorder-video" />
 
@@ -698,7 +721,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
               )}
 
               {isRecording && (
-                <div className="onscreen-recorder-recording-indicator">
+                <div className="onscreen-recorder-recording-indicator onscreen-recorder-fade-in">
                   <div className="onscreen-recorder-recording-dot" />
                   <p className="onscreen-recorder-recording-text">Recording…</p>
                   <p className="onscreen-recorder-recording-subtext">{recordingStatusText}</p>
