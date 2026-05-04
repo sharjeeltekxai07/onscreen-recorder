@@ -266,6 +266,19 @@
   filter: brightness(1.1);
 }
 
+.onscreen-recorder-button-warning {
+  flex: 1;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.39);
+}
+
+.onscreen-recorder-button-warning:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45);
+  filter: brightness(1.1);
+}
+
 .onscreen-recorder-button-purple:disabled,
 .onscreen-recorder-button-disabled {
   background: #334155;
