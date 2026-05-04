@@ -373,7 +373,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
     mediaRecorderRef.current.onstop = () => {
       addLog("Recording stopped, processing video...", "info");
-      if (cameraRecorderRef.current?.state === "recording") {
+      if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
         cameraRecorderRef.current.stop();
       }
       const blob = new Blob(chunksRef.current, { type: MIME_VIDEO });
@@ -382,6 +382,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       recordedBlobRef.current = blob;
       addLog(`Video ready! Size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, "success");
       releaseAllStreams();
+      setIsPaused(false);
       if (onRecordingStop) onRecordingStop(blob);
     };
 
@@ -389,16 +390,18 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       addLog("Recording error – stopping and releasing microphone", "error");
       releaseAllStreams();
       setIsRecording(false);
+      setIsPaused(false);
       if (onError) onError(new Error("MediaRecorder error"));
     };
 
     screenStream.getVideoTracks().forEach((track) => {
       track.onended = () => {
         addLog("Screen sharing stopped by browser – releasing microphone", "info");
-        if (mediaRecorderRef.current?.state === "recording") {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
           mediaRecorderRef.current.stop();
         }
         setIsRecording(false);
+        setIsPaused(false);
       };
     });
 
@@ -423,16 +426,42 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
     releaseAllStreams();
     setIsPreparing(false);
     setCountdown(null);
+    setIsPaused(false);
     addLog("Countdown cancelled", "info");
   }, [releaseAllStreams, addLog]);
 
+  const pauseRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording && !isPaused) {
+      if (cameraRecorderRef.current?.state === "recording") {
+        cameraRecorderRef.current.pause();
+      }
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+      addLog("Recording paused", "info");
+    }
+  }, [isRecording, isPaused, addLog]);
+
+  const resumeRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording && isPaused) {
+      if (cameraRecorderRef.current?.state === "paused") {
+        cameraRecorderRef.current.resume();
+      }
+      mediaRecorderRef.current.resume();
+      setIsPaused(false);
+      addLog("Recording resumed", "info");
+    }
+  }, [isRecording, isPaused, addLog]);
+
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
-      if (cameraRecorderRef.current?.state === "recording") {
+      if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
         cameraRecorderRef.current.stop();
       }
-      mediaRecorderRef.current.stop();
+      if (mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
       setIsRecording(false);
+      setIsPaused(false);
       addLog("Stop recording requested", "info");
     }
   }, [isRecording, addLog]);
@@ -652,10 +681,23 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
                     <p className="onscreen-recorder-preparing-text">Select your screen in the browser dialog…</p>
                   </div>
                 ) : (
-                  <button onClick={stopRecording} className="onscreen-recorder-button onscreen-recorder-button-danger onscreen-recorder-recording" type="button">
-                    <SquareIcon className="onscreen-recorder-button-icon" size={20} />
-                    Stop recording
-                  </button>
+                  <>
+                    {isPaused ? (
+                      <button onClick={resumeRecording} className="onscreen-recorder-button onscreen-recorder-button-success" type="button">
+                        <PlayIcon className="onscreen-recorder-button-icon" size={20} />
+                        Resume
+                      </button>
+                    ) : (
+                      <button onClick={pauseRecording} className="onscreen-recorder-button onscreen-recorder-button-warning" type="button">
+                        <PauseIcon className="onscreen-recorder-button-icon" size={20} />
+                        Pause
+                      </button>
+                    )}
+                    <button onClick={stopRecording} className="onscreen-recorder-button onscreen-recorder-button-danger onscreen-recorder-recording" type="button">
+                      <SquareIcon className="onscreen-recorder-button-icon" size={20} />
+                      Stop recording
+                    </button>
+                  </>
                 )}
               </div>
 
@@ -722,8 +764,8 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
               {isRecording && (
                 <div className="onscreen-recorder-recording-indicator onscreen-recorder-fade-in">
-                  <div className="onscreen-recorder-recording-dot" />
-                  <p className="onscreen-recorder-recording-text">Recording…</p>
+                  <div className={`onscreen-recorder-recording-dot ${isPaused ? "onscreen-recorder-paused-dot" : ""}`} style={isPaused ? { animation: "none", backgroundColor: "#f59e0b", boxShadow: "0 0 20px #f59e0b" } : undefined} />
+                  <p className="onscreen-recorder-recording-text">{isPaused ? "Paused" : "Recording…"}</p>
                   <p className="onscreen-recorder-recording-subtext">{recordingStatusText}</p>
                 </div>
               )}
