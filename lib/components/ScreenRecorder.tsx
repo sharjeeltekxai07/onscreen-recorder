@@ -455,9 +455,15 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
       if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
+        if (cameraRecorderRef.current.state === "paused") {
+          cameraRecorderRef.current.resume();
+        }
         cameraRecorderRef.current.stop();
       }
       if (mediaRecorderRef.current.state !== "inactive") {
+        if (mediaRecorderRef.current.state === "paused") {
+          mediaRecorderRef.current.resume();
+        }
         mediaRecorderRef.current.stop();
       }
       setIsRecording(false);
