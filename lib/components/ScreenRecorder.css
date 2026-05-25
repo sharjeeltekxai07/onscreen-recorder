@@ -462,6 +462,17 @@
   animation: onscreen-recorder-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+.onscreen-recorder-recording-time {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0.75rem 0 1.25rem 0;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
+  line-height: 1;
+}
+
 .onscreen-recorder-recording-text {
   color: #fff;
   font-size: 1.25rem;

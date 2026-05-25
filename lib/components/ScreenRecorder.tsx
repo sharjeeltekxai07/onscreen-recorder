@@ -42,8 +42,48 @@ const CHUNK_LOG_EVERY_N = 5;
 const CAMERA_PIP_SIZE = 0.2;
 const CAMERA_PIP_INSET = 16;
 const CAPTURE_FPS = 30;
-const MIME_VIDEO = "video/webm;codecs=vp8,opus";
-const MIME_VIDEO_VP8 = "video/webm;codecs=vp8";
+const getSupportedVideoMimeType = (): { main: string; camera: string } => {
+  if (typeof MediaRecorder === "undefined") {
+    return { main: "video/webm", camera: "video/webm" };
+  }
+  
+  const mainCandidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=h264,opus",
+    "video/webm",
+    "video/mp4;codecs=avc1,mp4a.40.2",
+    "video/mp4"
+  ];
+  
+  const cameraCandidates = [
+    "video/webm;codecs=vp8",
+    "video/webm;codecs=h264",
+    "video/webm",
+    "video/mp4;codecs=avc1",
+    "video/mp4"
+  ];
+  
+  let main = "video/webm";
+  for (const type of mainCandidates) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      main = type;
+      break;
+    }
+  }
+  
+  let camera = "video/webm";
+  for (const type of cameraCandidates) {
+    if (MediaRecorder.isTypeSupported(type)) {
+      camera = type;
+      break;
+    }
+  }
+  
+  return { main, camera };
+};
+
+const MIME_TYPES = typeof MediaRecorder !== "undefined" ? getSupportedVideoMimeType() : { main: "video/webm", camera: "video/webm" };
 
 type LogType = "info" | "success" | "error";
 const LOG_ICON: Record<LogType, string> = { error: "❌", success: "✓", info: "ℹ" };
@@ -102,6 +142,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const cameraRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -119,8 +160,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   const drawLoopIdRef = useRef<number | null>(null);
   const canvasStreamRef = useRef<MediaStream | null>(null);
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
-  const compositeScreenVideoRef = useRef<HTMLVideoElement | null>(null);
-  const compositeCameraVideoRef = useRef<HTMLVideoElement | null>(null);
+
 
   const addLog = useCallback(
     (message: string, type: LogType = "info") => {
@@ -216,12 +256,32 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       cameraVideo.play().catch(() => { });
       const camW = Math.floor(w * CAMERA_PIP_SIZE);
       const camH = Math.floor(h * CAMERA_PIP_SIZE);
-      const camX = CAMERA_PIP_INSET;
+      const camX = w - camW - CAMERA_PIP_INSET;
       const camY = h - camH - CAMERA_PIP_INSET;
       const draw = () => {
         if (screenVideo.readyState >= 2) {
           ctx.drawImage(screenVideo, 0, 0, w, h);
-          if (cameraVideo.readyState >= 2) ctx.drawImage(cameraVideo, camX, camY, camW, camH);
+          if (cameraVideo.readyState >= 2) {
+            ctx.save();
+            const radius = Math.min(camW, camH) / 2;
+            const centerX = camX + camW / 2;
+            const centerY = camY + camH / 2;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.clip();
+            
+            ctx.drawImage(cameraVideo, camX, camY, camW, camH);
+            ctx.restore();
+            
+            ctx.save();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+            ctx.lineWidth = Math.max(2, Math.floor(w * 0.002));
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
         }
         drawLoopIdRef.current = requestAnimationFrame(draw);
       };
@@ -248,8 +308,117 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
     if (stream) setCameraEnabled(true);
   }, [cameraEnabled, addLog, requestCameraPermission]);
 
-  const acquireStreamAndStartCountdown = async () => {
+  const startMediaRecorderWithStream = useCallback(() => {
+    const stream = combinedStreamRef.current;
+    const screenStream = screenStreamRef.current;
+    if (!stream || !screenStream) {
+      addLog("No stream available to record", "error");
+      releaseAllStreams();
+      setIsPreparing(false);
+      setCountdown(null);
+      return;
+    }
+
+    chunksRef.current = [];
+    chunkCountRef.current = 0;
+    const mime = MIME_TYPES.main;
+    addLog(`Using video mime type: ${mime}`, "info");
+    mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: mime });
+
+    mediaRecorderRef.current.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data);
+        chunkCountRef.current += 1;
+        if (chunkCountRef.current === 1 || chunkCountRef.current % CHUNK_LOG_EVERY_N === 0) {
+          addLog(`Data chunk ${chunkCountRef.current}: ${(e.data.size / 1024).toFixed(1)} KB`, "info");
+        }
+      }
+    };
+
+    const camStream = showCamera ? cameraStreamRef.current : null;
+    if (camStream && camStream.getVideoTracks().length > 0) {
+      cameraChunksRef.current = [];
+      const camMime = MIME_TYPES.camera;
+      addLog(`Using camera video mime type: ${camMime}`, "info");
+      cameraRecorderRef.current = new MediaRecorder(camStream, { mimeType: camMime });
+      cameraRecorderRef.current.ondataavailable = (e) => {
+        if (e.data.size > 0) cameraChunksRef.current.push(e.data);
+      };
+      cameraRecorderRef.current.onstop = () => {
+        const camBlob = new Blob(cameraChunksRef.current, { type: camMime });
+        recordedCameraBlobRef.current = camBlob;
+        setRecordedCameraURL(URL.createObjectURL(camBlob));
+        addLog(`Camera video ready: ${(camBlob.size / 1024).toFixed(1)} KB`, "success");
+      };
+      cameraRecorderRef.current.start(1000);
+    }
+
+    mediaRecorderRef.current.onstop = () => {
+      addLog("Recording stopped, processing video...", "info");
+      if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
+        if (cameraRecorderRef.current.state === "paused") {
+          cameraRecorderRef.current.resume();
+        }
+        cameraRecorderRef.current.stop();
+      }
+      const blob = new Blob(chunksRef.current, { type: mime });
+      const url = URL.createObjectURL(blob);
+      setRecordedVideoURL(url);
+      recordedBlobRef.current = blob;
+      addLog(`Video ready! Size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, "success");
+      releaseAllStreams();
+      setIsPaused(false);
+      if (onRecordingStop) onRecordingStop(blob);
+    };
+
+    mediaRecorderRef.current.onerror = () => {
+      addLog("Recording error – stopping and releasing microphone", "error");
+      releaseAllStreams();
+      setIsRecording(false);
+      setIsPaused(false);
+      if (onError) onError(new Error("MediaRecorder error"));
+    };
+
+    screenStream.getVideoTracks().forEach((track) => {
+      track.onended = () => {
+        addLog("Screen sharing stopped by browser – releasing microphone", "info");
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+          if (mediaRecorderRef.current.state === "paused") {
+            mediaRecorderRef.current.resume();
+          }
+          mediaRecorderRef.current.stop();
+        }
+        setIsRecording(false);
+        setIsPaused(false);
+      };
+    });
+
+    mediaRecorderRef.current.start(1000);
+    setIsRecording(true);
+    setIsPreparing(false);
+    setCountdown(null);
+    combinedStreamRef.current = null;
+    addLog("Recording in progress...", "success");
+    if (onRecordingStart) onRecordingStart();
+  }, [
+    addLog,
+    releaseAllStreams,
+    showCamera,
+    onRecordingStop,
+    onError,
+    onRecordingStart,
+  ]);
+
+  const acquireStreamAndStartCountdown = useCallback(async () => {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        const errMsg = "Screen recording is not supported on this browser or device (mobile browsers are not supported).";
+        addLog(errMsg, "error");
+        const error = new Error(errMsg);
+        if (onError) onError(error);
+        return;
+      }
+
       addLog("Requesting screen capture...", "info");
 
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
@@ -273,7 +442,6 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       const audioTracks: MediaStreamTrack[] = [];
       if (screenStream.getAudioTracks().length > 0) audioTracks.push(...screenStream.getAudioTracks());
 
-      // Request microphone if enabled
       if (micEnabled) {
         const micStream = await requestMicPermission();
         if (micStream) {
@@ -328,95 +496,23 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       setIsPreparing(false);
       setCountdown(null);
     }
-  };
-
-  const startMediaRecorderWithStream = () => {
-    const stream = combinedStreamRef.current;
-    const screenStream = screenStreamRef.current;
-    if (!stream || !screenStream) {
-      addLog("No stream available to record", "error");
-      releaseAllStreams();
-      setIsPreparing(false);
-      setCountdown(null);
-      return;
-    }
-
-    chunksRef.current = [];
-    chunkCountRef.current = 0;
-    mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: MIME_VIDEO });
-
-    mediaRecorderRef.current.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunksRef.current.push(e.data);
-        chunkCountRef.current += 1;
-        if (chunkCountRef.current === 1 || chunkCountRef.current % CHUNK_LOG_EVERY_N === 0) {
-          addLog(`Data chunk ${chunkCountRef.current}: ${(e.data.size / 1024).toFixed(1)} KB`, "info");
-        }
-      }
-    };
-
-    const camStream = showCamera ? cameraStreamRef.current : null;
-    if (camStream && camStream.getVideoTracks().length > 0) {
-      cameraChunksRef.current = [];
-      cameraRecorderRef.current = new MediaRecorder(camStream, { mimeType: MIME_VIDEO_VP8 });
-      cameraRecorderRef.current.ondataavailable = (e) => {
-        if (e.data.size > 0) cameraChunksRef.current.push(e.data);
-      };
-      cameraRecorderRef.current.onstop = () => {
-        const camBlob = new Blob(cameraChunksRef.current, { type: MIME_VIDEO_VP8 });
-        recordedCameraBlobRef.current = camBlob;
-        setRecordedCameraURL(URL.createObjectURL(camBlob));
-        addLog(`Camera video ready: ${(camBlob.size / 1024).toFixed(1)} KB`, "success");
-      };
-      cameraRecorderRef.current.start(1000);
-    }
-
-    mediaRecorderRef.current.onstop = () => {
-      addLog("Recording stopped, processing video...", "info");
-      if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
-        cameraRecorderRef.current.stop();
-      }
-      const blob = new Blob(chunksRef.current, { type: MIME_VIDEO });
-      const url = URL.createObjectURL(blob);
-      setRecordedVideoURL(url);
-      recordedBlobRef.current = blob;
-      addLog(`Video ready! Size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, "success");
-      releaseAllStreams();
-      setIsPaused(false);
-      if (onRecordingStop) onRecordingStop(blob);
-    };
-
-    mediaRecorderRef.current.onerror = () => {
-      addLog("Recording error – stopping and releasing microphone", "error");
-      releaseAllStreams();
-      setIsRecording(false);
-      setIsPaused(false);
-      if (onError) onError(new Error("MediaRecorder error"));
-    };
-
-    screenStream.getVideoTracks().forEach((track) => {
-      track.onended = () => {
-        addLog("Screen sharing stopped by browser – releasing microphone", "info");
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          mediaRecorderRef.current.stop();
-        }
-        setIsRecording(false);
-        setIsPaused(false);
-      };
-    });
-
-    mediaRecorderRef.current.start(1000);
-    setIsRecording(true);
-    setIsPreparing(false);
-    setCountdown(null);
-    combinedStreamRef.current = null;
-    addLog("Recording in progress...", "success");
-    if (onRecordingStart) onRecordingStart();
-  };
+  }, [
+    addLog,
+    cameraEnabled,
+    countdownSeconds,
+    micEnabled,
+    onError,
+    requestCameraPermission,
+    requestMicPermission,
+    showCamera,
+    compositeScreenWithCamera,
+    releaseAllStreams,
+    startMediaRecorderWithStream,
+  ]);
 
   const startRecording = useCallback(() => {
     acquireStreamAndStartCountdown();
-  }, []);
+  }, [acquireStreamAndStartCountdown]);
 
   const cancelCountdown = useCallback(() => {
     if (countdownTimeoutRef.current) {
@@ -549,6 +645,33 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
         .join(" · ") || "Screen only",
     [micEnabled, hasMicPermission, showCamera, cameraEnabled, hasCameraPermission]
   );
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (isRecording && !isPaused) {
+      interval = setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } else if (!isRecording) {
+      setRecordingTime(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRecording, isPaused]);
+
+  const formatTime = useCallback((seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    
+    if (hrs > 0) {
+      return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+    }
+    return `${pad(mins)}:${pad(secs)}`;
+  }, []);
 
   useEffect(() => {
     addLog("Screen Recorder initialized", "success");
@@ -771,6 +894,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
               {isRecording && (
                 <div className="onscreen-recorder-recording-indicator onscreen-recorder-fade-in">
                   <div className={`onscreen-recorder-recording-dot ${isPaused ? "onscreen-recorder-paused-dot" : ""}`} style={isPaused ? { animation: "none", backgroundColor: "#f59e0b", boxShadow: "0 0 20px #f59e0b" } : undefined} />
+                  <div className="onscreen-recorder-recording-time">{formatTime(recordingTime)}</div>
                   <p className="onscreen-recorder-recording-text">{isPaused ? "Paused" : "Recording…"}</p>
                   <p className="onscreen-recorder-recording-subtext">{recordingStatusText}</p>
                 </div>
