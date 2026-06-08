@@ -132,6 +132,8 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   className = "",
 }) => {
   const [isRecording, setIsRecording] = useState(false);
+  const [screenPermissionDeclined, setScreenPermissionDeclined] = useState(false);
+  const [micPermissionDeclined, setMicPermissionDeclined] = useState(false);
   const [recordedVideoURL, setRecordedVideoURL] = useState<string | null>(null);
   const [recordedCameraURL, setRecordedCameraURL] = useState<string | null>(null);
   const [consoleLogs, setConsoleLogs] = useState<Array<{ message: string; type: LogType; timestamp: string }>>([]);
@@ -184,6 +186,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
         if (isAudio) {
           micStreamRef.current = stream;
           setHasMicPermission(true);
+          setMicPermissionDeclined(false);
         } else {
           cameraStreamRef.current = stream;
           setHasCameraPermission(true);
@@ -193,13 +196,18 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       } catch (err) {
         const error = err as Error;
         addLog(`${label} permission denied: ${error.message}`, "error");
-        if (isAudio) setHasMicPermission(false);
+        if (isAudio) {
+          setHasMicPermission(false);
+          if (error.name === "NotAllowedError" || error.message?.includes("Permission") || error.message?.includes("denied")) {
+            setMicPermissionDeclined(true);
+          }
+        }
         else setHasCameraPermission(false);
         if (onError) onError(error);
         return null;
       }
     },
-    [addLog, onError]
+    [addLog, onError, setMicPermissionDeclined]
   );
   const requestMicPermission = useCallback(() => requestMediaPermission("audio"), [requestMediaPermission]);
   const requestCameraPermission = useCallback(() => requestMediaPermission("video"), [requestMediaPermission]);
@@ -411,6 +419,8 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
   const acquireStreamAndStartCountdown = useCallback(async () => {
     try {
+      setScreenPermissionDeclined(false);
+      setMicPermissionDeclined(false);
       if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
         const errMsg = "Screen recording is not supported on this browser or device (mobile browsers are not supported).";
         addLog(errMsg, "error");
@@ -491,6 +501,9 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
     } catch (err) {
       const error = err as Error;
       addLog(`Error: ${error.message}`, "error");
+      if (error.name === "NotAllowedError" || error.message?.includes("Permission") || error.message?.includes("denied")) {
+        setScreenPermissionDeclined(true);
+      }
       if (onError) onError(error);
       releaseAllStreams();
       setIsPreparing(false);
@@ -771,10 +784,115 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
             </p>
 
             <div className="onscreen-recorder-controls">
+              {screenPermissionDeclined && !isRecording && !isPreparing && (
+                <div className="onscreen-recorder-permission-warning onscreen-recorder-fade-in">
+                  <div className="onscreen-recorder-warning-header">
+                    <span className="onscreen-recorder-warning-icon">⚠️</span>
+                    <h3 className="onscreen-recorder-warning-title">Screen Sharing Blocked</h3>
+                  </div>
+                  <p className="onscreen-recorder-warning-text">
+                    Screen sharing permission was declined. To record your screen, the browser needs permission.
+                  </p>
+                  <div className="onscreen-recorder-warning-steps">
+                    <h4 className="onscreen-recorder-steps-title">How to enable permission again:</h4>
+                    <ol className="onscreen-recorder-steps-list">
+                      <li>
+                        Click the <strong>lock icon</strong> (🔒) next to the URL in your browser's address bar.
+                      </li>
+                      <li>
+                        Find <strong>Screen Sharing</strong> (or <strong>Screen</strong>) and set it to <strong>Allow</strong>.
+                      </li>
+                      <li>
+                        Click <strong>Try Again</strong> below to start recording.
+                      </li>
+                    </ol>
+                    <div className="onscreen-recorder-os-tip">
+                      <strong>macOS Users:</strong> If permissions are allowed in the browser but recording still fails, open <strong>System Settings &gt; Privacy &amp; Security &gt; Screen Recording</strong> and ensure your browser is allowed.
+                    </div>
+                  </div>
+                  <div className="onscreen-recorder-warning-actions">
+                    <button
+                      type="button"
+                      onClick={startRecording}
+                      className="onscreen-recorder-button onscreen-recorder-button-primary"
+                    >
+                      <PlayIcon className="onscreen-recorder-button-icon" size={20} />
+                      Try Again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScreenPermissionDeclined(false)}
+                      className="onscreen-recorder-button onscreen-recorder-button-secondary"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {micPermissionDeclined && !isRecording && !isPreparing && (
+                <div className="onscreen-recorder-permission-warning onscreen-recorder-fade-in">
+                  <div className="onscreen-recorder-warning-header">
+                    <span className="onscreen-recorder-warning-icon">🎤</span>
+                    <h3 className="onscreen-recorder-warning-title">Microphone Access Blocked</h3>
+                  </div>
+                  <p className="onscreen-recorder-warning-text">
+                    Microphone permission was declined. To record audio, the browser needs permission.
+                  </p>
+                  <div className="onscreen-recorder-warning-steps">
+                    <h4 className="onscreen-recorder-steps-title">How to enable permission again:</h4>
+                    <ol className="onscreen-recorder-steps-list">
+                      <li>
+                        Click the <strong>lock icon</strong> (🔒) next to the URL in your browser's address bar.
+                      </li>
+                      <li>
+                        Find <strong>Microphone</strong> and set it to <strong>Allow</strong>.
+                      </li>
+                      <li>
+                        Click <strong>Grant Permission</strong> below to re-request access.
+                      </li>
+                    </ol>
+                    <div className="onscreen-recorder-os-tip">
+                      <strong>macOS Users:</strong> If permissions are allowed in the browser but microphone audio still fails, open <strong>System Settings &gt; Privacy &amp; Security &gt; Microphone</strong> and ensure your browser is allowed.
+                    </div>
+                  </div>
+                  <div className="onscreen-recorder-warning-actions">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const stream = await requestMicPermission();
+                        if (stream) {
+                          setMicPermissionDeclined(false);
+                          stream.getTracks().forEach((t) => t.stop());
+                          micStreamRef.current = null;
+                        }
+                      }}
+                      className="onscreen-recorder-button onscreen-recorder-button-primary"
+                    >
+                      <MicIcon className="onscreen-recorder-button-icon" size={20} />
+                      Grant Permission
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMicPermissionDeclined(false)}
+                      className="onscreen-recorder-button onscreen-recorder-button-secondary"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {!isRecording && !isPreparing && (
                 <div className="onscreen-recorder-toggles">
                   <button
-                    onClick={() => setMicEnabled(!micEnabled)}
+                    onClick={() => {
+                      const next = !micEnabled;
+                      setMicEnabled(next);
+                      if (!next) {
+                        setMicPermissionDeclined(false);
+                      }
+                    }}
                     className={`onscreen-recorder-toggle ${micEnabled ? "onscreen-recorder-toggle-on" : ""}`}
                     title={micEnabled ? "Microphone on" : "Microphone off"}
                     type="button"
