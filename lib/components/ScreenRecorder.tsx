@@ -162,6 +162,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   const drawLoopIdRef = useRef<number | null>(null);
   const canvasStreamRef = useRef<MediaStream | null>(null);
   const cameraPreviewRef = useRef<HTMLVideoElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
 
   const addLog = useCallback(
@@ -240,6 +241,11 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
     if (combinedStreamRef.current) {
       combinedStreamRef.current.getTracks().forEach((t) => t.stop());
       combinedStreamRef.current = null;
+    }
+    // Bug 2: Close AudioContext to prevent OS-level audio resource leak
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
     }
   }, []);
 
@@ -405,7 +411,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
     setIsRecording(true);
     setIsPreparing(false);
     setCountdown(null);
-    combinedStreamRef.current = null;
+    // Bug 3: Do NOT null out combinedStreamRef here — releaseAllStreams needs it to stop tracks
     addLog("Recording in progress...", "success");
     if (onRecordingStart) onRecordingStart();
   }, [
@@ -459,7 +465,9 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
           const micAudioTracks = micStream.getAudioTracks();
           if (screenAudioTracks.length > 0 && micAudioTracks.length > 0) {
             try {
+              // Bug 2: Store AudioContext in ref so it can be closed in releaseAllStreams
               const audioContext = new AudioContext();
+              audioContextRef.current = audioContext;
               const screenAudioSource = audioContext.createMediaStreamSource(new MediaStream(screenAudioTracks));
               const micAudioSource = audioContext.createMediaStreamSource(micStream);
               const destination = audioContext.createMediaStreamDestination();
@@ -563,12 +571,8 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
-      if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
-        if (cameraRecorderRef.current.state === "paused") {
-          cameraRecorderRef.current.resume();
-        }
-        cameraRecorderRef.current.stop();
-      }
+      // Bug 4: Do NOT stop cameraRecorder here — mediaRecorder.onstop handles it to avoid double-stop
+      // (double-stop throws InvalidStateError on an already-inactive MediaRecorder)
       if (mediaRecorderRef.current.state !== "inactive") {
         if (mediaRecorderRef.current.state === "paused") {
           mediaRecorderRef.current.resume();
@@ -593,17 +597,24 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
     [addLog]
   );
 
+  // Bug 6: Derive file extension from the actual mime type (e.g. mp4 on Safari)
+  const getVideoExtension = useCallback((mimeType: string): string => {
+    if (mimeType.includes("mp4")) return "mp4";
+    return "webm";
+  }, []);
+
   const downloadVideo = useCallback(() => {
     if (recordedVideoURL && recordedBlobRef.current) {
+      const ext = getVideoExtension(MIME_TYPES.main);
       triggerDownload(
         recordedVideoURL,
-        `screen-recording-${Date.now()}.webm`,
+        `screen-recording-${Date.now()}.${ext}`,
         "Video download initiated",
         recordedBlobRef.current,
         onDownload ?? undefined
       );
     }
-  }, [recordedVideoURL, onDownload, triggerDownload]);
+  }, [recordedVideoURL, onDownload, triggerDownload, getVideoExtension]);
 
   const downloadCameraVideo = useCallback(() => {
     if (recordedCameraURL && recordedCameraBlobRef.current) {
@@ -618,12 +629,12 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
   const clearRecording = useCallback(() => {
     if (recordedVideoURL) {
-      URL.revokeObjectURL(recordedVideoURL);
+      // Bug 8: Do NOT revoke here — the useEffect cleanup below revokes the previous URL
+      // whenever state changes, preventing double-revoke.
       setRecordedVideoURL(null);
       recordedBlobRef.current = null;
     }
     if (recordedCameraURL) {
-      URL.revokeObjectURL(recordedCameraURL);
       setRecordedCameraURL(null);
       recordedCameraBlobRef.current = null;
     }
@@ -695,6 +706,8 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
 
   useEffect(() => {
     if (countdown === 0) {
+      // Bug 1: Clear isPreparing before starting so the spinner does not flash
+      setIsPreparing(false);
       setCountdown(null);
       startMediaRecorderWithStream();
       return;
@@ -860,11 +873,11 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
                     <button
                       type="button"
                       onClick={async () => {
+                        // Bug 7: Do NOT stop the acquired stream — leave it alive in micStreamRef
+                        // for the next recording. releaseAllStreams will clean it up properly.
                         const stream = await requestMicPermission();
                         if (stream) {
                           setMicPermissionDeclined(false);
-                          stream.getTracks().forEach((t) => t.stop());
-                          micStreamRef.current = null;
                         }
                       }}
                       className="onscreen-recorder-button onscreen-recorder-button-primary"
