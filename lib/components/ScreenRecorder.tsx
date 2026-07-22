@@ -113,6 +113,8 @@ export interface ScreenRecorderProps {
   showHeader?: boolean;
   /** Show the debug console panel. Set to true for development; keep false for a cleaner end-user UI. */
   showConsole?: boolean;
+  /** Maximum recording time in seconds. If set, recording will stop automatically when this time is reached. */
+  maxRecordingTime?: number;
   /** Custom class name for the container */
   className?: string;
 }
@@ -129,6 +131,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
   countdownSeconds = 3,
   showHeader = true,
   showConsole = false,
+  maxRecordingTime,
   className = "",
 }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -674,7 +677,13 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
     let interval: ReturnType<typeof setInterval> | null = null;
     if (isRecording && !isPaused) {
       interval = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
+        setRecordingTime((prev) => {
+          const next = prev + 1;
+          if (maxRecordingTime && next >= maxRecordingTime) {
+            stopRecording();
+          }
+          return next;
+        });
       }, 1000);
     } else if (!isRecording) {
       setRecordingTime(0);
@@ -682,7 +691,7 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isRecording, isPaused]);
+  }, [isRecording, isPaused, maxRecordingTime, stopRecording]);
 
   const formatTime = useCallback((seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -744,6 +753,19 @@ const ScreenRecorderComponent: React.FC<ScreenRecorderProps> = ({
       if (recordedCameraURL) URL.revokeObjectURL(recordedCameraURL);
     };
   }, [recordedVideoURL, recordedCameraURL]);
+
+  useEffect(() => {
+    // Component unmount cleanup
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      if (cameraRecorderRef.current && cameraRecorderRef.current.state !== "inactive") {
+        cameraRecorderRef.current.stop();
+      }
+      releaseAllStreams();
+    };
+  }, [releaseAllStreams]);
 
   return (
     <div

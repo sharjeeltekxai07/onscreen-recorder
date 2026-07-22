@@ -84,9 +84,16 @@ function App() {
 | `defaultMicEnabled`   | `boolean` | `true`  | Whether microphone is enabled by default |
 | `defaultCameraEnabled` | `boolean` | `false` | Whether camera (webcam) is enabled by default – records as PiP in the screen video and as a separate camera-only video file |
 | `countdownSeconds`   | `number`                 | `3`         | Seconds to count down (3, 2, 1) after you select your screen; then recording starts. Use `0` to start immediately. |
+| `maxRecordingTime`   | `number`                 | `undefined` | Maximum recording time in seconds. If set, recording will stop automatically when this time is reached. Protects against out-of-memory browser crashes on very long recordings. |
 | `showHeader`        | `boolean`                 | `true`      | Show the main "Screen Recorder" header. Set to `false` when embedding inside your own layout (e.g. sidebar, modal). |
 | `showConsole`       | `boolean`                 | `false`     | Show the debug console panel. Set to `true` for development; keep `false` for a cleaner end-user UI. |
 | `className`         | `string`                 | `""`        | Additional CSS class name for the container                                                      |
+
+### Error Handling & Limits
+
+- **Permissions**: If the user denies permission to the screen, camera, or microphone, the component provides a built-in fallback UI instructing them on how to re-enable it. The `onError` callback will also be triggered so your app can react.
+- **Recording Length**: MediaRecorder holds video chunks in memory (Blob). Very long recordings (hours) can crash the browser tab. Use the `maxRecordingTime` prop to enforce a hard limit on recording duration to prevent this.
+- **Cleanup**: If the consuming component unmounts mid-recording, all media tracks and the camera/mic streams are automatically stopped and released to prevent memory and privacy leaks.
 
 ## Examples
 
