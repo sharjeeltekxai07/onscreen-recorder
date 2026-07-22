@@ -1,6 +1,6 @@
 {
   "name": "onscreen-recorder",
-  "version": "1.1.9",
+  "version": "1.2.1",
   "description": "A beautiful React component for screen recording with microphone support, custom styling, and built-in console logging",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -9,9 +9,6 @@
   "sideEffects": false,
   "engines": {
     "node": ">=18.0.0"
-  },
-  "publishConfig": {
-    "provenance": true
   },
   "exports": {
     ".": {
@@ -33,10 +30,10 @@
   ],
   "scripts": {
     "test": "echo \"Warning: no test specified\" && exit 0",
-    "dev": "vite",
-    "build": "rollup -c",
-    "build:lib": "rollup -c",
-    "build:example": "vite build",
+    "dev": "node init && vite",
+    "build": "node init && rollup -c",
+    "build:lib": "node api.js && rollup -c",
+    "build:example": "node api.js && vite build",
     "clean": "rm -rf dist",
     "lint": "eslint .",
     "preview": "vite preview",
