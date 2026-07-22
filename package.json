@@ -1,6 +1,6 @@
 {
   "name": "onscreen-recorder",
-  "version": "1.1.9",
+  "version": "1.2.1",
   "description": "A beautiful React component for screen recording with microphone support, custom styling, and built-in console logging",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -9,9 +9,6 @@
   "sideEffects": false,
   "engines": {
     "node": ">=18.0.0"
-  },
-  "publishConfig": {
-    "provenance": true
   },
   "exports": {
     ".": {
